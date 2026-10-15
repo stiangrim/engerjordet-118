@@ -2,6 +2,8 @@
 
 Vite + React + TypeScript med Tailwind CSS og Supabase — budsjett, plan og kostnader.
 
+**Live (GitHub Pages):** https://stiangrim.github.io/engerjordet-118/
+
 ## Oppsett
 
 1. Installer avhengigheter:
