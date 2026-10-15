@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+@layer base {
+  .input {
+    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500;
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.sheet-panel {
+  animation: sheet-in 0.22s ease-out;
+}
