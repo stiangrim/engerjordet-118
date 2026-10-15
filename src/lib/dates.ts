@@ -47,6 +47,21 @@ export function formatNorwegianDateMedium(
   return mediumDateFormatter.format(parseIsoDate(iso))
 }
 
+const dateTimeFormatter = new Intl.DateTimeFormat('nb-NO', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+})
+
+export function formatNorwegianDateTime(iso: string | null | undefined): string {
+  if (!iso?.trim()) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  return dateTimeFormatter.format(d)
+}
+
 export function formatNorwegianDateRange(
   start: string | null | undefined,
   end: string | null | undefined,

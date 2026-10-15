@@ -1,6 +1,6 @@
 export type AccessRole = 'readonly' | 'full'
 
-type LoginOk = { role: AccessRole; token: string }
+type LoginOk = { role: AccessRole; token: string; actor: string }
 
 export type LoginResult = LoginOk | 'unavailable' | null
 
@@ -33,16 +33,19 @@ export async function loginWithPassword(password: string): Promise<LoginResult> 
   const data = (await res.json()) as LoginOk
   if (
     (data.role !== 'readonly' && data.role !== 'full') ||
-    typeof data.token !== 'string'
+    typeof data.token !== 'string' ||
+    typeof data.actor !== 'string'
   ) {
     return null
   }
   return data
 }
 
+export type ValidatedSession = { role: AccessRole; actor: string }
+
 export async function validateSessionToken(
   token: string,
-): Promise<AccessRole | null> {
+): Promise<ValidatedSession | null> {
   let res: Response
   try {
     res = await callVerifyAccess({ action: 'validate', token })
@@ -50,7 +53,8 @@ export async function validateSessionToken(
     return null
   }
   if (!res.ok) return null
-  const data = (await res.json()) as { role?: AccessRole }
+  const data = (await res.json()) as { role?: AccessRole; actor?: string }
   if (data.role !== 'readonly' && data.role !== 'full') return null
-  return data.role
+  if (typeof data.actor !== 'string' || !data.actor.trim()) return null
+  return { role: data.role, actor: data.actor.trim() }
 }

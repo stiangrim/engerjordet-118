@@ -3,6 +3,7 @@ import {
   type ReceiptCostType,
 } from './constants'
 import { insertWithColumnFallback, updateWithColumnFallback } from './errors'
+import { recordAudit } from './auditLog'
 import { supabase } from './supabase'
 import type {
   BudgetItem,
@@ -183,7 +184,15 @@ export async function createCostEntry(
     ['payment_status', 'payee_id'],
   )
   if (error) throw error
-  return data as CostEntry
+  const row = data as CostEntry
+  void recordAudit({
+    projectId,
+    action: 'create',
+    entityType: 'cost_entry',
+    entityId: row.id,
+    summary: `Ny manuell post${input.description ? `: ${input.description.slice(0, 80)}` : ''}`,
+  })
+  return row
 }
 
 export async function updateCostEntry(
@@ -197,12 +206,33 @@ export async function updateCostEntry(
     .select()
     .single()
   if (error) throw error
+  void recordAudit({
+    projectId: data.project_id,
+    action: 'update',
+    entityType: 'cost_entry',
+    entityId: data.id,
+    summary: `Oppdaterte manuell post${data.description ? `: ${data.description.slice(0, 80)}` : ''}`,
+  })
   return data
 }
 
 export async function deleteCostEntry(id: string): Promise<void> {
+  const { data: row } = await supabase
+    .from('cost_entries')
+    .select('project_id, description')
+    .eq('id', id)
+    .maybeSingle()
   const { error } = await supabase.from('cost_entries').delete().eq('id', id)
   if (error) throw error
+  if (row?.project_id) {
+    void recordAudit({
+      projectId: row.project_id,
+      action: 'delete',
+      entityType: 'cost_entry',
+      entityId: id,
+      summary: `Slettet manuell post${row.description ? `: ${String(row.description).slice(0, 80)}` : ''}`,
+    })
+  }
 }
 
 export function groupByCategory(
@@ -289,6 +319,13 @@ export async function createPayee(
     .select()
     .single()
   if (error) throw error
+  void recordAudit({
+    projectId,
+    action: 'create',
+    entityType: 'payee',
+    entityId: data.id,
+    summary: `Ny mottaker: ${input.name}`,
+  })
   return data
 }
 
@@ -303,12 +340,33 @@ export async function updatePayee(
     .select()
     .single()
   if (error) throw error
+  void recordAudit({
+    projectId: data.project_id,
+    action: 'update',
+    entityType: 'payee',
+    entityId: data.id,
+    summary: `Oppdaterte mottaker: ${data.name}`,
+  })
   return data
 }
 
 export async function deletePayee(id: string): Promise<void> {
+  const { data: row } = await supabase
+    .from('payees')
+    .select('project_id, name')
+    .eq('id', id)
+    .maybeSingle()
   const { error } = await supabase.from('payees').delete().eq('id', id)
   if (error) throw error
+  if (row?.project_id) {
+    void recordAudit({
+      projectId: row.project_id,
+      action: 'delete',
+      entityType: 'payee',
+      entityId: id,
+      summary: `Slettet mottaker: ${row.name}`,
+    })
+  }
 }
 
 export async function fetchPayeePayments(
@@ -335,6 +393,20 @@ export async function createPayeePayment(
     .select()
     .single()
   if (error) throw error
+  const { data: payee } = await supabase
+    .from('payees')
+    .select('project_id, name')
+    .eq('id', input.payee_id)
+    .maybeSingle()
+  if (payee?.project_id) {
+    void recordAudit({
+      projectId: payee.project_id,
+      action: 'create',
+      entityType: 'payee_payment',
+      entityId: data.id,
+      summary: `Innbetaling til ${payee.name}`,
+    })
+  }
   return data
 }
 
@@ -349,12 +421,47 @@ export async function updatePayeePayment(
     .select()
     .single()
   if (error) throw error
+  const { data: payee } = await supabase
+    .from('payees')
+    .select('project_id, name')
+    .eq('id', data.payee_id)
+    .maybeSingle()
+  if (payee?.project_id) {
+    void recordAudit({
+      projectId: payee.project_id,
+      action: 'update',
+      entityType: 'payee_payment',
+      entityId: data.id,
+      summary: `Oppdaterte innbetaling (${payee.name})`,
+    })
+  }
   return data
 }
 
 export async function deletePayeePayment(id: string): Promise<void> {
+  const { data: row } = await supabase
+    .from('payee_payments')
+    .select('payee_id')
+    .eq('id', id)
+    .maybeSingle()
   const { error } = await supabase.from('payee_payments').delete().eq('id', id)
   if (error) throw error
+  if (row?.payee_id) {
+    const { data: payee } = await supabase
+      .from('payees')
+      .select('project_id, name')
+      .eq('id', row.payee_id)
+      .maybeSingle()
+    if (payee?.project_id) {
+      void recordAudit({
+        projectId: payee.project_id,
+        action: 'delete',
+        entityType: 'payee_payment',
+        entityId: id,
+        summary: `Slettet innbetaling (${payee.name})`,
+      })
+    }
+  }
 }
 
 export type CreateReceiptInput = {
@@ -379,7 +486,15 @@ export async function createReceipt(input: CreateReceiptInput): Promise<Receipt>
   )
 
   if (error) throw error
-  return data as Receipt
+  const row = data as Receipt
+  void recordAudit({
+    projectId: input.project_id,
+    action: 'create',
+    entityType: 'receipt',
+    entityId: row.id,
+    summary: `Ny kvittering${input.vendor ? `: ${input.vendor.slice(0, 80)}` : ''}`,
+  })
+  return row
 }
 
 export async function signedReceiptUrl(
@@ -446,6 +561,13 @@ export async function createBudgetItem(
     .single()
   if (error) throw error
   await syncCurrentBudgetFromItems(projectId)
+  void recordAudit({
+    projectId,
+    action: 'create',
+    entityType: 'budget_item',
+    entityId: data.id,
+    summary: `Ny budsjettpost: ${input.post}`,
+  })
   return data
 }
 
@@ -462,6 +584,13 @@ export async function updateBudgetItem(
     .single()
   if (error) throw error
   await syncCurrentBudgetFromItems(projectId)
+  void recordAudit({
+    projectId,
+    action: 'update',
+    entityType: 'budget_item',
+    entityId: data.id,
+    summary: `Oppdaterte budsjettpost: ${data.post}`,
+  })
   return data
 }
 
@@ -469,9 +598,21 @@ export async function deleteBudgetItem(
   id: string,
   projectId: string,
 ): Promise<void> {
+  const { data: row } = await supabase
+    .from('budget_items')
+    .select('post')
+    .eq('id', id)
+    .maybeSingle()
   const { error } = await supabase.from('budget_items').delete().eq('id', id)
   if (error) throw error
   await syncCurrentBudgetFromItems(projectId)
+  void recordAudit({
+    projectId,
+    action: 'delete',
+    entityType: 'budget_item',
+    entityId: id,
+    summary: `Slettet budsjettpost${row?.post ? `: ${row.post}` : ''}`,
+  })
 }
 
 export type SchedulePeriodWrite = {
@@ -499,6 +640,13 @@ export async function createSchedulePeriod(
     .select()
     .single()
   if (error) throw error
+  void recordAudit({
+    projectId,
+    action: 'create',
+    entityType: 'schedule_period',
+    entityId: data.id,
+    summary: `Ny planperiode: ${input.period_label}`,
+  })
   return data
 }
 
@@ -513,12 +661,33 @@ export async function updateSchedulePeriod(
     .select()
     .single()
   if (error) throw error
+  void recordAudit({
+    projectId: data.project_id,
+    action: 'update',
+    entityType: 'schedule_period',
+    entityId: data.id,
+    summary: `Oppdaterte planperiode: ${data.period_label}`,
+  })
   return data
 }
 
 export async function deleteSchedulePeriod(id: string): Promise<void> {
+  const { data: row } = await supabase
+    .from('schedule_periods')
+    .select('project_id, period_label')
+    .eq('id', id)
+    .maybeSingle()
   const { error } = await supabase.from('schedule_periods').delete().eq('id', id)
   if (error) throw error
+  if (row?.project_id) {
+    void recordAudit({
+      projectId: row.project_id,
+      action: 'delete',
+      entityType: 'schedule_period',
+      entityId: id,
+      summary: `Slettet planperiode: ${row.period_label}`,
+    })
+  }
 }
 
 export type CriticalTaskWrite = {
@@ -543,6 +712,13 @@ export async function createCriticalTask(
     .select()
     .single()
   if (error) throw error
+  void recordAudit({
+    projectId,
+    action: 'create',
+    entityType: 'critical_task',
+    entityId: data.id,
+    summary: `Nytt kritisk punkt: ${input.title}`,
+  })
   return data
 }
 
@@ -557,12 +733,33 @@ export async function updateCriticalTask(
     .select()
     .single()
   if (error) throw error
+  void recordAudit({
+    projectId: data.project_id,
+    action: 'update',
+    entityType: 'critical_task',
+    entityId: data.id,
+    summary: `Oppdaterte kritisk punkt: ${data.title}`,
+  })
   return data
 }
 
 export async function deleteCriticalTask(id: string): Promise<void> {
+  const { data: row } = await supabase
+    .from('critical_tasks')
+    .select('project_id, title')
+    .eq('id', id)
+    .maybeSingle()
   const { error } = await supabase.from('critical_tasks').delete().eq('id', id)
   if (error) throw error
+  if (row?.project_id) {
+    void recordAudit({
+      projectId: row.project_id,
+      action: 'delete',
+      entityType: 'critical_task',
+      entityId: id,
+      summary: `Slettet kritisk punkt: ${row.title}`,
+    })
+  }
 }
 
 export type MilestoneWrite = {
@@ -585,6 +782,13 @@ export async function createMilestone(
     .select()
     .single()
   if (error) throw error
+  void recordAudit({
+    projectId,
+    action: 'create',
+    entityType: 'milestone',
+    entityId: data.id,
+    summary: `Ny milepæl: ${input.title}`,
+  })
   return data
 }
 
@@ -599,12 +803,33 @@ export async function updateMilestone(
     .select()
     .single()
   if (error) throw error
+  void recordAudit({
+    projectId: data.project_id,
+    action: 'update',
+    entityType: 'milestone',
+    entityId: data.id,
+    summary: `Oppdaterte milepæl: ${data.title}`,
+  })
   return data
 }
 
 export async function deleteMilestone(id: string): Promise<void> {
+  const { data: row } = await supabase
+    .from('milestones')
+    .select('project_id, title')
+    .eq('id', id)
+    .maybeSingle()
   const { error } = await supabase.from('milestones').delete().eq('id', id)
   if (error) throw error
+  if (row?.project_id) {
+    void recordAudit({
+      projectId: row.project_id,
+      action: 'delete',
+      entityType: 'milestone',
+      entityId: id,
+      summary: `Slettet milepæl: ${row.title}`,
+    })
+  }
 }
 
 export type ReceiptUpdate = {
@@ -630,7 +855,15 @@ export async function updateReceipt(
     ['payment_status'],
   )
   if (error) throw error
-  return data as Receipt
+  const row = data as Receipt
+  void recordAudit({
+    projectId: row.project_id,
+    action: 'update',
+    entityType: 'receipt',
+    entityId: row.id,
+    summary: `Oppdaterte kvittering${row.vendor ? `: ${row.vendor.slice(0, 80)}` : ''}`,
+  })
+  return row
 }
 
 export async function deleteReceipt(receipt: Receipt): Promise<void> {
@@ -640,6 +873,13 @@ export async function deleteReceipt(receipt: Receipt): Promise<void> {
   if (storageError) throw storageError
   const { error } = await supabase.from('receipts').delete().eq('id', receipt.id)
   if (error) throw error
+  void recordAudit({
+    projectId: receipt.project_id,
+    action: 'delete',
+    entityType: 'receipt',
+    entityId: receipt.id,
+    summary: `Slettet kvittering${receipt.vendor ? `: ${receipt.vendor.slice(0, 80)}` : ''}`,
+  })
 }
 
 export function nextSortOrder(items: { sort_order: number }[]): number {

@@ -30,11 +30,24 @@ function timingEqual(a: string, b: string): boolean {
   return diff === 0
 }
 
-function resolveRole(password: string): Role | null {
+function actorForRole(role: Role): string {
+  if (role === "readonly") {
+    return Deno.env.get("ACCESS_ACTOR_READONLY") ?? "Lesetilgang"
+  }
+  return Deno.env.get("ACCESS_ACTOR_FULL") ?? "Redaktør"
+}
+
+function resolveRoleAndActor(
+  password: string,
+): { role: Role; actor: string } | null {
   const full = Deno.env.get("ACCESS_PASSWORD_FULL") ?? ""
   const ro = Deno.env.get("ACCESS_PASSWORD_READONLY") ?? ""
-  if (full.length > 0 && timingEqual(password, full)) return "full"
-  if (ro.length > 0 && timingEqual(password, ro)) return "readonly"
+  if (full.length > 0 && timingEqual(password, full)) {
+    return { role: "full", actor: actorForRole("full") }
+  }
+  if (ro.length > 0 && timingEqual(password, ro)) {
+    return { role: "readonly", actor: actorForRole("readonly") }
+  }
   return null
 }
 
@@ -65,9 +78,14 @@ async function signPayload(payloadB64: string, secret: string): Promise<string> 
   return base64UrlEncode(new Uint8Array(sig))
 }
 
-async function createToken(role: Role, secret: string): Promise<string> {
+async function createToken(
+  role: Role,
+  actor: string,
+  secret: string,
+): Promise<string> {
   const payload = {
     role,
+    actor,
     exp: Date.now() + SESSION_TTL_MS,
   }
   const payloadB64 = base64UrlEncode(
@@ -80,7 +98,7 @@ async function createToken(role: Role, secret: string): Promise<string> {
 async function verifyToken(
   token: string,
   secret: string,
-): Promise<Role | null> {
+): Promise<{ role: Role; actor: string } | null> {
   const dot = token.indexOf(".")
   if (dot <= 0) return null
   const payloadB64 = token.slice(0, dot)
@@ -90,10 +108,14 @@ async function verifyToken(
   try {
     const payload = JSON.parse(
       new TextDecoder().decode(base64UrlDecode(payloadB64)),
-    ) as { role?: Role; exp?: number }
+    ) as { role?: Role; actor?: string; exp?: number }
     if (payload.role !== "readonly" && payload.role !== "full") return null
     if (typeof payload.exp !== "number" || payload.exp < Date.now()) return null
-    return payload.role
+    const actor =
+      typeof payload.actor === "string" && payload.actor.trim()
+        ? payload.actor.trim()
+        : actorForRole(payload.role)
+    return { role: payload.role, actor }
   } catch {
     return null
   }
@@ -128,21 +150,25 @@ Deno.serve(async (req) => {
   if (body.action === "login") {
     const password = body.password ?? ""
     if (!password) return json({ error: "missing_password" }, 400)
-    const role = resolveRole(password)
-    if (!role) {
+    const resolved = resolveRoleAndActor(password)
+    if (!resolved) {
       await new Promise((r) => setTimeout(r, 400))
       return json({ error: "invalid_credentials" }, 401)
     }
-    const token = await createToken(role, sessionSecret)
-    return json({ role, token })
+    const token = await createToken(
+      resolved.role,
+      resolved.actor,
+      sessionSecret,
+    )
+    return json({ role: resolved.role, actor: resolved.actor, token })
   }
 
   if (body.action === "validate") {
     const token = body.token ?? ""
     if (!token) return json({ error: "missing_token" }, 400)
-    const role = await verifyToken(token, sessionSecret)
-    if (!role) return json({ error: "invalid_token" }, 401)
-    return json({ role })
+    const session = await verifyToken(token, sessionSecret)
+    if (!session) return json({ error: "invalid_token" }, 401)
+    return json({ role: session.role, actor: session.actor })
   }
 
   return json({ error: "unknown_action" }, 400)

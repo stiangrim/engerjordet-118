@@ -128,6 +128,18 @@ export type BudgetItemWithActual = BudgetItem & {
   variance: number
 }
 
+export type AuditLogEntry = {
+  id: string
+  project_id: string
+  actor: string
+  role: string
+  action: string
+  entity_type: string
+  entity_id: string | null
+  summary: string
+  created_at: string
+}
+
 export type ReceiptParseSuggestion = {
   vendor?: string
   receipt_date?: string

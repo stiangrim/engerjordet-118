@@ -18,6 +18,7 @@ import {
   storeAccessToken,
   type AccessRole,
 } from './accessConfig'
+import { setAuditSession } from '../lib/auditSession'
 
 type AccessContextValue = {
   role: AccessRole
@@ -40,13 +41,17 @@ export function AccessProvider({ children }: { children: ReactNode }) {
   const [booting, setBooting] = useState(authEnabled)
 
   useEffect(() => {
-    if (!authEnabled) return
+    if (!authEnabled) {
+      setAuditSession({ actor: 'Utvikling', role: 'full' })
+      return
+    }
     let cancelled = false
     void (async () => {
       const token = loadStoredAccessToken()
       if (!token) {
         if (!cancelled) {
           setRole('none')
+          setAuditSession(null)
           setBooting(false)
         }
         return
@@ -54,10 +59,13 @@ export function AccessProvider({ children }: { children: ReactNode }) {
       const validated = await validateSessionToken(token)
       if (cancelled) return
       if (validated) {
-        setRole(validated)
+        setRole(validated.role)
+        storeAccessToken(token, validated.actor)
+        setAuditSession({ role: validated.role, actor: validated.actor })
       } else {
         clearStoredAccessToken()
         setRole('none')
+        setAuditSession(null)
       }
       setBooting(false)
     })()
@@ -70,8 +78,9 @@ export function AccessProvider({ children }: { children: ReactNode }) {
     const result = await loginWithPassword(password)
     if (result === 'unavailable') return 'unavailable'
     if (!result) return false
-    storeAccessToken(result.token)
+    storeAccessToken(result.token, result.actor)
     setRole(result.role)
+    setAuditSession({ role: result.role, actor: result.actor })
     return true
   }, [])
 
@@ -79,14 +88,16 @@ export function AccessProvider({ children }: { children: ReactNode }) {
     const result = await loginWithPassword(password)
     if (result === 'unavailable') return 'unavailable'
     if (!result || result.role !== 'full') return false
-    storeAccessToken(result.token)
+    storeAccessToken(result.token, result.actor)
     setRole('full')
+    setAuditSession({ role: 'full', actor: result.actor })
     return true
   }, [])
 
   const logout = useCallback(() => {
     clearStoredAccessToken()
     setRole(authEnabled ? 'none' : 'full')
+    setAuditSession(authEnabled ? null : { actor: 'Utvikling', role: 'full' })
   }, [authEnabled])
 
   const value = useMemo(

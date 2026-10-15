@@ -38,13 +38,19 @@ Sett `VITE_ACCESS_AUTH=true` for innlogging. Passord ligger **ikke** i frontend 
 supabase functions deploy verify-access
 supabase secrets set \
   ACCESS_SESSION_SECRET="$(openssl rand -hex 32)" \
-  ACCESS_PASSWORD_READONLY="ditt-enkle-les-passord" \
+  ACCESS_PASSWORD_READONLY="ditt-les-passord" \
   ACCESS_PASSWORD_FULL="ditt-rediger-passord"
 ```
 
-**Les** og **rediger** må ha **ulike** passord (les kan være enkelt). Hvis de er like, avviser `verify-access` innlogging.
+**Les** og **rediger** må ha **ulike** passord. Lesepassord bør fortsatt være vanskelig å gjette (ikke «gjest» / «1234»). Hvis de er like, avviser `verify-access` innlogging.
 
 Oppdater lesepassord: `supabase secrets set ACCESS_PASSWORD_READONLY="…"`
+
+Valgfritt visningsnavn i endringslogg (kun internt i token / audit, ikke vist for lesemodus):
+
+```bash
+supabase secrets set ACCESS_ACTOR_READONLY="…" ACCESS_ACTOR_FULL="…"
+```
 
 Restart `npm run dev` etter env-endringer.
 
@@ -60,7 +66,7 @@ Last opp kvitteringer under **Kostnader** i appen. Beløp registreres **inkl. mv
 
 ## Publisering
 
-**Produksjon (GitHub Pages):** se repo **Settings → Pages** for URL.
+**Produksjon:** https://stiangrim.github.io/engerjordet-118/
 
 Ved push til `main` bygger [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml). Repo-secrets (Settings → Secrets → Actions):
 
@@ -80,6 +86,10 @@ Passord til innlogging ligger kun i Supabase Function-secrets (`verify-access`).
 - Ingen personnavn eller budsjettbeløp i kildekode eller migrasjoner.
 - Sensitive data ligger i Supabase og bak passord.
 - Eldre git-historikk kan fortsatt inneholde seed fra før opprydding — vurder `git filter-repo` eller rotering av passord hvis repoet har vært offentlig lenge.
+
+## Endringslogg (redigering)
+
+I redigeringsmodus vises en sammenleggbar **Endringslogg** nederst på siden (hvem gjorde hva og når). Kun sesjon med redigeringstilgang kan se loggen og skrive nye linjer ved endringer i appen.
 
 ## Redigering i appen
 

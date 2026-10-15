@@ -9,6 +9,7 @@ import { formatNok, parseAmount } from '../lib/money'
 import { StatusBadge } from '../components/StatusBadge'
 import { PayeeAccountsSection } from '../components/PayeeAccountsSection'
 import { budgetLabelByIdMap } from '../lib/budgetItemDisplay'
+import { recordAudit } from '../lib/auditLog'
 import {
   countByStatus,
   syncCurrentBudgetFromItems,
@@ -64,6 +65,13 @@ function OverviewContent({
         frame_budget: parseAmount(frame),
         original_budget: parseAmount(original),
         current_budget: parseAmount(current),
+      })
+      void recordAudit({
+        projectId: project.id,
+        action: 'update',
+        entityType: 'project',
+        entityId: project.id,
+        summary: 'Oppdaterte prosjekt / rammer',
       })
       setSheetOpen(false)
       onChanged()

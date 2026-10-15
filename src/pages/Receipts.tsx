@@ -9,7 +9,6 @@ import {
   createReceipt,
   deleteCostEntry,
   deleteReceipt,
-  signedReceiptUrl,
   updateCostEntry,
   updateReceipt,
   uploadReceiptFile,
@@ -36,7 +35,7 @@ import { SearchableSelect } from '../components/SearchableSelect'
 import { budgetLabelByIdMap } from '../lib/budgetItemDisplay'
 import { budgetItemOptions, receiptCostTypeOptions } from '../lib/selectOptions'
 import { formatSupabaseError } from '../lib/errors'
-import { normalizePaymentStatus } from '../lib/paymentStatus'
+import { normalizePaymentStatus, paymentStatusBadgeClass } from '../lib/paymentStatus'
 import { supabase } from '../lib/supabase'
 import { SideSheet } from '../components/SideSheet'
 import { PayeeAccountsSection } from '../components/PayeeAccountsSection'
@@ -374,7 +373,10 @@ function ReceiptSection({
   onChanged: () => void
 }) {
   const [sheet, setSheet] = useState<
-    { mode: 'create' } | { mode: 'edit'; receipt: Receipt } | null
+    | { mode: 'create' }
+    | { mode: 'edit'; receipt: Receipt }
+    | { mode: 'view'; receipt: Receipt }
+    | null
   >(null)
 
   const labelById = useMemo(() => budgetLabelByIdMap(budgetItems), [budgetItems])
@@ -385,8 +387,11 @@ function ReceiptSection({
     setSheet(null)
   }
 
-  function openReceipt(receipt: Receipt) {
-    if (!canWrite) return
+  function openReceipt(receipt: Receipt, viewOnly = false) {
+    if (viewOnly || !canWrite) {
+      setSheet({ mode: 'view', receipt })
+      return
+    }
     setSheet({ mode: 'edit', receipt })
   }
 
@@ -416,8 +421,12 @@ function ReceiptSection({
               <ReceiptRow
                 receipt={r}
                 budgetLabel={labelById.get(r.budget_item_id ?? '')}
-                selected={sheet?.mode === 'edit' && sheet.receipt.id === r.id}
+                selected={
+                  (sheet?.mode === 'edit' || sheet?.mode === 'view') &&
+                  sheet.receipt.id === r.id
+                }
                 onOpen={() => openReceipt(r)}
+                onViewFile={() => openReceipt(r, true)}
                 onPaymentChange={(s) =>
                   void updateReceipt(r.id, { payment_status: s }).then(onChanged)
                 }
@@ -433,12 +442,12 @@ function ReceiptSection({
         title={
           sheet?.mode === 'create'
             ? 'Ny kvittering'
-            : sheet?.mode === 'edit'
+            : sheet?.mode === 'edit' || sheet?.mode === 'view'
               ? receiptTitle(sheet.receipt)
               : ''
         }
         description={
-          sheet?.mode === 'edit'
+          sheet?.mode === 'edit' || sheet?.mode === 'view'
             ? `${formatNok(Number(sheet.receipt.amount))}${sheet.receipt.receipt_date ? ` · ${formatNorwegianDateMedium(sheet.receipt.receipt_date)}` : ''}`
             : sheet?.mode === 'create'
               ? 'Telles som faktisk kostnad på valgt budsjettpost.'
@@ -466,6 +475,13 @@ function ReceiptSection({
               closeSheet()
               onChanged()
             }}
+          />
+        ) : null}
+        {sheet?.mode === 'view' ? (
+          <ReceiptViewPanel
+            key={sheet.receipt.id}
+            receipt={sheet.receipt}
+            budgetLabel={labelById.get(sheet.receipt.budget_item_id ?? '')}
           />
         ) : null}
       </SideSheet>
@@ -657,6 +673,75 @@ function Field({
   )
 }
 
+function ReceiptViewPanel({
+  receipt,
+  budgetLabel,
+}: {
+  receipt: Receipt
+  budgetLabel?: string
+}) {
+  const status = normalizePaymentStatus(receipt.payment_status)
+  const extra = receiptMetaExtra(receipt, receiptTitle(receipt))
+
+  return (
+    <div className="space-y-4">
+      <StoredReceiptPreview storagePath={receipt.storage_path} />
+      <dl className="grid gap-3 text-sm sm:grid-cols-2">
+        {receipt.vendor.trim() ? (
+          <div>
+            <dt className="text-slate-500">Leverandør</dt>
+            <dd className="font-medium text-slate-900">{receipt.vendor.trim()}</dd>
+          </div>
+        ) : null}
+        <div>
+          <dt className="text-slate-500">Dato</dt>
+          <dd className="font-medium text-slate-900">
+            {formatNorwegianDate(receipt.receipt_date)}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-slate-500">Beløp inkl. mva</dt>
+          <dd className="font-medium text-slate-900">{formatNok(Number(receipt.amount))}</dd>
+        </div>
+        <div>
+          <dt className="text-slate-500">Type</dt>
+          <dd className="font-medium text-slate-900">
+            {receiptCostTypeLabel(receipt.cost_type)}
+          </dd>
+        </div>
+        {budgetLabel ? (
+          <div className="sm:col-span-2">
+            <dt className="text-slate-500">Budsjettpost</dt>
+            <dd className="font-medium text-slate-900">{budgetLabel}</dd>
+          </div>
+        ) : null}
+        {extra ? (
+          <div className="sm:col-span-2">
+            <dt className="text-slate-500">Detaljer</dt>
+            <dd className="text-slate-900">{extra}</dd>
+          </div>
+        ) : null}
+        {receipt.description.trim() ? (
+          <div className="sm:col-span-2">
+            <dt className="text-slate-500">Beskrivelse</dt>
+            <dd className="whitespace-pre-wrap text-slate-900">{receipt.description.trim()}</dd>
+          </div>
+        ) : null}
+        <div>
+          <dt className="text-slate-500">Betaling</dt>
+          <dd>
+            <span
+              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${paymentStatusBadgeClass(status)}`}
+            >
+              {status}
+            </span>
+          </dd>
+        </div>
+      </dl>
+    </div>
+  )
+}
+
 function ReceiptEditForm({
   receipt,
   budgetItems,
@@ -813,27 +898,26 @@ function ReceiptRow({
   budgetLabel,
   selected,
   onOpen,
+  onViewFile,
   onPaymentChange,
 }: {
   receipt: Receipt
   budgetLabel?: string
   selected: boolean
   onOpen: () => void
+  onViewFile: () => void
   onPaymentChange: (status: PaymentStatus) => void
 }) {
-  async function openFile(e: React.MouseEvent) {
-    e.stopPropagation()
-    const url = await signedReceiptUrl(receipt.storage_path)
-    if (url) window.open(url, '_blank', 'noopener,noreferrer')
-  }
-
+  const canWrite = useCanWrite()
   const title = receiptTitle(receipt)
   const metaExtra = receiptMetaExtra(receipt, title)
+  const openLabel = canWrite ? 'Rediger kvittering' : 'Vis kvittering'
 
   return (
     <div
       tabIndex={0}
       role="button"
+      aria-label={openLabel}
       onClick={onOpen}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -843,7 +927,7 @@ function ReceiptRow({
       }}
       className={`rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm ${clickableCardClass} ${selectedRowClass(selected)}`}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <CostLineSummary
           title={title}
           amount={Number(receipt.amount)}
@@ -862,10 +946,13 @@ function ReceiptRow({
         />
         <button
           type="button"
-          onClick={(e) => void openFile(e)}
-          className="shrink-0 rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-white"
+          onClick={(e) => {
+            e.stopPropagation()
+            onViewFile()
+          }}
+          className="shrink-0 self-start rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-900 transition-colors hover:border-slate-400 hover:bg-white sm:min-w-[8.5rem]"
         >
-          Vis fil
+          Vis kvittering
         </button>
       </div>
     </div>

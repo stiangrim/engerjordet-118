@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAccess } from '../access/AccessContext'
 import { useProjectTitle } from '../context/ProjectTitleContext'
+import { AuditLogPanel } from './AuditLogPanel'
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   [
@@ -75,6 +76,7 @@ export function Layout() {
       </header>
       <main className="mx-auto max-w-5xl px-4 py-6">
         <Outlet />
+        <AuditLogPanel />
       </main>
     </div>
   )
