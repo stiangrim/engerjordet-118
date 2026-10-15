@@ -1,0 +1,8 @@
+-- Kopier til private.sql (gitignored). Ikke commit prosjektspesifikke navn eller beløp.
+
+-- insert into public.project (name, original_budget, current_budget, frame_budget)
+-- values ('Prosjektnavn', 0, 0, 0)
+-- returning id;
+
+-- insert into public.budget_items (...) values (...);
+-- insert into public.payees (project_id, name) values (...);

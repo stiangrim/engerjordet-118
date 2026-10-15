@@ -44,8 +44,7 @@ export function WorkerPaymentOverview({
         <h3 className="font-medium">Arbeid uten mottaker</h3>
         <p className="mt-2 text-sm text-slate-600">
           Poster uten valgt mottaker kan fortsatt merkes Betalt / Ikke betalt
-          per linje. Knytt heller til en mottaker (f.eks. Dalius) for samlet
-          oppfølging.
+          per linje. Knytt heller til en mottaker for samlet oppfølging.
         </p>
       </section>
     )
@@ -58,8 +57,8 @@ export function WorkerPaymentOverview({
       <div>
         <h3 className="font-medium">Arbeid uten mottaker</h3>
         <p className="mt-1 text-sm text-slate-600">
-          Kun poster som ikke er knyttet til en mottaker. For Dalius m.m., bruk
-          mottaker-kortet over.
+          Kun poster som ikke er knyttet til en mottaker. For håndverkere med
+          samlet betaling, bruk mottaker-fanen.
         </p>
       </div>
 

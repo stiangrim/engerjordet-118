@@ -13,6 +13,7 @@ dist-ssr
 *.local
 
 supabase/.temp/
+supabase/seed/private.sql
 
 # Editor directories and files
 .vscode/*

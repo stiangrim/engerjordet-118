@@ -72,7 +72,7 @@ export function PayeeAccountsSection({
         <div>
           <h3 className="font-medium">Mottakere (hvem du skylder)</h3>
           <p className="mt-1 max-w-2xl text-sm text-slate-600">
-            Knytt timer og kostnader til f.eks. Dalius på hver budsjettpost.
+            Knytt timer og kostnader til en mottaker på hver budsjettpost.
             <span className="font-medium"> Skyldig totalt</span> følger sum
             knyttede poster pluss valgfritt ekstra. Registrer{' '}
             <span className="font-medium">innbetalinger</span> (Vipps, kontant
@@ -321,7 +321,7 @@ function PayeeForm({
           className="input mt-1"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="F.eks. Dalius"
+          placeholder="F.eks. håndverker eller firma"
         />
       </label>
 

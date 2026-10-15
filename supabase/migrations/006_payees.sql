@@ -25,11 +25,3 @@ alter table public.receipts
 
 create index if not exists cost_entries_payee_id_idx on public.cost_entries (payee_id);
 create index if not exists receipts_payee_id_idx on public.receipts (payee_id);
-
-insert into public.payees (project_id, name)
-select p.id, 'Dalius'
-from public.project p
-where not exists (
-  select 1 from public.payees pe
-  where pe.project_id = p.id and pe.name = 'Dalius'
-);

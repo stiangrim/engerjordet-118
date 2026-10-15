@@ -1,6 +1,6 @@
-# Engerjordet 118
+# Renoveringsprosjekt (Vite + Supabase)
 
-Vite + React + TypeScript med Tailwind CSS og Supabase.
+Vite + React + TypeScript med Tailwind CSS og Supabase — budsjett, plan og kostnader.
 
 ## Oppsett
 
@@ -20,6 +20,7 @@ cp .env.local.example .env.local
 
 - `VITE_SUPABASE_URL` — prosjektets API-URL
 - `VITE_SUPABASE_ANON_KEY` — den offentlige `anon`-nøkkelen
+- Valgfritt `VITE_APP_TITLE` — vises på innloggingsskjerm (uten å hente fra DB)
 
 4. Start utviklingsserveren:
 
@@ -41,17 +42,11 @@ supabase secrets set \
 
 Samme passord gir full tilgang hvis du kun setter `ACCESS_PASSWORD_FULL`. Restart `npm run dev` etter env-endringer.
 
-## Database og seed
+## Database
 
-1. Åpne [Supabase SQL Editor](https://supabase.com/dashboard) for prosjektet.
-2. Lim inn og kjør hele filen [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql).
+Kjør migrasjoner med `supabase db push` (eller SQL-filene i `supabase/migrations/` i rekkefølge).
 
-Det oppretter tabeller, RLS, storage-bucket `receipts`, og seed-data fra Excel (budsjett, plan, kritiske punkter, milepæler).
-
-3. Kjør også [`supabase/migrations/002_cost_entries.sql`](supabase/migrations/002_cost_entries.sql) for manuelle kostnader (timer uten kvittering).
-4. Kjør [`supabase/migrations/003_payment_status.sql`](supabase/migrations/003_payment_status.sql) og [`004_payment_status_two_values.sql`](supabase/migrations/004_payment_status_two_values.sql) for betalingsstatus (Betalt / Ikke betalt).
-5. Kjør [`supabase/migrations/005_receipt_cost_types.sql`](supabase/migrations/005_receipt_cost_types.sql) for flere typer på kvitteringer (verktøy, leie, frakt, osv.).
-6. Kjør [`supabase/migrations/006_payees.sql`](supabase/migrations/006_payees.sql) for mottakere (f.eks. Dalius) med samlet skyldig/betalt.
+`001_init.sql` oppretter **skjema** (tabeller, RLS, storage). Prosjektspesifikk data (navn, budsjett, plan, mottakere) legges i [`supabase/seed/private.sql`](supabase/seed/README.md) — filen committes **ikke**.
 
 ## Kvitteringer
 
@@ -59,25 +54,30 @@ Last opp kvitteringer under **Kostnader** i appen. Beløp registreres **inkl. mv
 
 ## Publisering
 
-**Produksjon (GitHub Pages):** https://stiangrim.github.io/engerjordet-118/
+**Produksjon (GitHub Pages):** se repo **Settings → Pages** for URL.
 
-Ved push til `main` bygger [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml) og publiserer automatisk. Repo-secrets (Settings → Secrets → Actions):
+Ved push til `main` bygger [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml). Repo-secrets (Settings → Secrets → Actions):
 
 | Secret | Innhold |
 |--------|---------|
 | `VITE_SUPABASE_URL` | Supabase API URL |
 | `VITE_SUPABASE_ANON_KEY` | Supabase anon key |
 | `VITE_ACCESS_AUTH` | `true` |
+| `VITE_APP_TITLE` (valgfri) | Generisk tittel på innlogging |
 
 Passord til innlogging ligger kun i Supabase Function-secrets (`verify-access`).
 
-**Alternativ:** `vercel.json` finnes for Vercel (root-domene, ingen `/engerjordet-118/`-base). Importer [github.com/stiangrim/engerjordet-118](https://github.com/stiangrim/engerjordet-118) og sett samme env-variabler der.
+**Alternativ:** `vercel.json` for Vercel (root-domene). Sett samme env-variabler der.
+
+## Sikkerhet (offentlig repo)
+
+- Ingen personnavn eller budsjettbeløp i kildekode eller migrasjoner.
+- Sensitive data ligger i Supabase og bak passord.
+- Eldre git-historikk kan fortsatt inneholde seed fra før opprydding — vurder `git filter-repo` eller rotering av passord hvis repoet har vært offentlig lenge.
 
 ## Redigering i appen
 
-Du kan oppdatere data direkte uten SQL:
-
-- **Oversikt** → *Rediger rammer* (prosjektramme, opprinnelig/gjeldende budsjett, eller synk sum fra poster)
-- **Budsjett** → *Rediger* / *Ny budsjettpost* (inkl. slett)
-- **Plan** → *Rediger* / *Ny periode*, *Nytt punkt*, *Ny milepæl*
-- **Kostnader** → manuelle timer/beløp + kvitteringer, knyttet til budsjettpost
+- **Oversikt** → *Rediger rammer*
+- **Budsjett** → *Rediger* / *Ny budsjettpost*
+- **Plan** → perioder, kritiske punkter, milepæler
+- **Kostnader** → kvitteringer, manuelle poster, mottakere

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAccess } from '../access/AccessContext'
+import { useProjectTitle } from '../context/ProjectTitleContext'
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   [
@@ -12,6 +13,7 @@ const linkClass = ({ isActive }: { isActive: boolean }) =>
 
 export function Layout() {
   const { authEnabled, isReadOnly, canWrite, logout } = useAccess()
+  const projectTitle = useProjectTitle()
   const [upgradeOpen, setUpgradeOpen] = useState(false)
 
   return (
@@ -41,7 +43,7 @@ export function Layout() {
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Totalrenovering
             </p>
-            <h1 className="text-xl font-semibold">Engerjordet 118</h1>
+            <h1 className="text-xl font-semibold">{projectTitle}</h1>
           </div>
           <div className="flex flex-wrap items-center gap-2">
           <nav className="flex flex-wrap gap-1">

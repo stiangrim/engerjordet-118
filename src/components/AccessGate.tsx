@@ -1,5 +1,9 @@
 import { useState } from 'react'
 import { useAccess } from '../access/AccessContext'
+import {
+  ProjectTitleProvider,
+  useProjectTitle,
+} from '../context/ProjectTitleContext'
 
 type Props = {
   children: React.ReactNode
@@ -50,13 +54,41 @@ export function AccessGate({ children }: Props) {
   }
 
   return (
+    <ProjectTitleProvider loadFromDatabase={false}>
+      <LoginScreen
+        password={password}
+        setPassword={setPassword}
+        error={error}
+        busy={busy}
+        onSubmit={submit}
+      />
+    </ProjectTitleProvider>
+  )
+}
+
+function LoginScreen({
+  password,
+  setPassword,
+  error,
+  busy,
+  onSubmit,
+}: {
+  password: string
+  setPassword: (v: string) => void
+  error: string | null
+  busy: boolean
+  onSubmit: (e: React.FormEvent) => void
+}) {
+  const projectTitle = useProjectTitle()
+
+  return (
     <div className="flex min-h-svh items-center justify-center bg-slate-100 px-4">
       <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Engerjordet 118
+          {projectTitle}
         </p>
         <h1 className="mt-1 text-xl font-semibold text-slate-900">Logg inn</h1>
-        <form onSubmit={submit} className="mt-6 space-y-4">
+        <form onSubmit={onSubmit} className="mt-6 space-y-4">
           <label className="block text-sm">
             <span className="font-medium text-slate-800">Passord</span>
             <input
