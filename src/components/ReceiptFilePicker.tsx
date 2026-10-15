@@ -6,9 +6,17 @@ type Props = {
   file: File | null
   onFileChange: (file: File | null) => void
   disabled?: boolean
+  /** Standard kvittering vs valgfritt vedlegg på oversikt */
+  purpose?: 'receipt' | 'attachment'
 }
 
-export function ReceiptFilePicker({ file, onFileChange, disabled }: Props) {
+export function ReceiptFilePicker({
+  file,
+  onFileChange,
+  disabled,
+  purpose = 'receipt',
+}: Props) {
+  const isAttachment = purpose === 'attachment'
   const inputId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = useState(false)
@@ -33,7 +41,7 @@ export function ReceiptFilePicker({ file, onFileChange, disabled }: Props) {
   return (
     <div className="space-y-3">
       <span className="block text-sm font-medium text-slate-700">
-        Kvittering (bilde eller PDF)
+        {isAttachment ? 'Vedlegg (valgfritt)' : 'Kvittering (bilde eller PDF)'}
       </span>
 
       <input
@@ -41,7 +49,7 @@ export function ReceiptFilePicker({ file, onFileChange, disabled }: Props) {
         id={inputId}
         type="file"
         accept="image/*,.heic,.heif,application/pdf"
-        capture="environment"
+        capture={isAttachment ? undefined : 'environment'}
         disabled={disabled}
         className="sr-only"
         onChange={onInputChange}
@@ -69,7 +77,9 @@ export function ReceiptFilePicker({ file, onFileChange, disabled }: Props) {
             Dra fil hit, eller velg fra enheten
           </p>
           <p className="mt-1 text-xs text-slate-500">
-            JPG, PNG, HEIC eller PDF · beløp er inkl. mva
+            {isAttachment
+              ? 'PDF, JPG, PNG eller HEIC – f.eks. tegninger eller tilbud'
+              : 'JPG, PNG, HEIC eller PDF · beløp er inkl. mva'}
           </p>
           <button
             type="button"

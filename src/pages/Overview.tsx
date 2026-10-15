@@ -8,6 +8,7 @@ import { useProjectData } from '../hooks/useProjectData'
 import { formatNok, parseAmount } from '../lib/money'
 import { StatusBadge } from '../components/StatusBadge'
 import { PayeeAccountsSection } from '../components/PayeeAccountsSection'
+import { ProjectAttachmentsSection } from '../components/ProjectAttachmentsSection'
 import { budgetLabelByIdMap } from '../lib/budgetItemDisplay'
 import { recordAudit } from '../lib/auditLog'
 import {
@@ -36,8 +37,15 @@ function OverviewContent({
   data: NonNullable<ReturnType<typeof useProjectData>['data']>
   onChanged: () => void
 }) {
-  const { project, budgetItems, payees, payeePayments, receipts, costEntries } =
-    data
+  const {
+    project,
+    budgetItems,
+    payees,
+    payeePayments,
+    receipts,
+    costEntries,
+    projectAttachments,
+  } = data
   const actual = totalActual(receipts, costEntries)
   const remaining = project.frame_budget - actual
   const buffer = project.frame_budget - project.current_budget
@@ -133,6 +141,12 @@ function OverviewContent({
           />
         </div>
       </section>
+
+      <ProjectAttachmentsSection
+        projectId={project.id}
+        attachments={projectAttachments}
+        onChanged={onChanged}
+      />
 
       <PayeeAccountsSection
         projectId={project.id}

@@ -8,6 +8,7 @@ import {
   fetchPayeePayments,
   fetchPayees,
   fetchProject,
+  fetchProjectAttachments,
   fetchReceipts,
   fetchSchedulePeriods,
 } from '../lib/project'
@@ -20,6 +21,7 @@ import type {
   CostEntry,
   Payee,
   PayeePayment,
+  ProjectAttachment,
   Receipt,
   SchedulePeriod,
 } from '../lib/types'
@@ -34,6 +36,7 @@ type ProjectData = {
   schedulePeriods: SchedulePeriod[]
   criticalTasks: CriticalTask[]
   milestones: Milestone[]
+  projectAttachments: ProjectAttachment[]
 }
 
 export function useProjectData() {
@@ -61,6 +64,7 @@ export function useProjectData() {
         schedulePeriods,
         criticalTasks,
         milestones,
+        projectAttachments,
       ] = await Promise.all([
         fetchBudgetItems(project.id),
         fetchReceipts(project.id),
@@ -69,6 +73,7 @@ export function useProjectData() {
         fetchSchedulePeriods(project.id),
         fetchCriticalTasks(project.id),
         fetchMilestones(project.id),
+        fetchProjectAttachments(project.id).catch(() => [] as ProjectAttachment[]),
       ])
       const payeePayments = await fetchPayeePayments(payees.map((p) => p.id)).catch(
         () => [] as PayeePayment[],
@@ -83,6 +88,7 @@ export function useProjectData() {
         schedulePeriods,
         criticalTasks,
         milestones,
+        projectAttachments,
       })
     } catch (e) {
       setError(formatLoadError(e))

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { signedReceiptUrl } from '../lib/project'
+import { PROJECT_ATTACHMENTS_BUCKET, signedReceiptUrl, signedStorageUrl } from '../lib/project'
 import {
   canPreviewReceiptFile,
   isHeicLike,
@@ -275,15 +275,19 @@ export function LocalReceiptPreview({ file }: { file: File }) {
   )
 }
 
-export function StoredReceiptPreview({
+export function StoredFilePreview({
   storagePath,
+  bucket = 'receipts',
+  emptyLabel = 'fil',
 }: {
   storagePath: string
+  bucket?: string
+  emptyLabel?: string
 }) {
   const [url, setUrl] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
   const [loading, setLoading] = useState(true)
-  const fileName = storagePath.split('/').pop() ?? 'kvittering'
+  const fileName = storagePath.split('/').pop() ?? emptyLabel
   const isPdf = isPdfLike(fileName)
   const isHeic = isHeicLike(fileName)
 
@@ -295,7 +299,10 @@ export function StoredReceiptPreview({
     setLoading(true)
 
     void (async () => {
-      const signed = await signedReceiptUrl(storagePath)
+      const signed =
+        bucket === 'receipts'
+          ? await signedReceiptUrl(storagePath)
+          : await signedStorageUrl(bucket, storagePath)
       if (cancelled) return
       if (!signed) {
         setFailed(true)
@@ -321,12 +328,12 @@ export function StoredReceiptPreview({
       cancelled = true
       if (blobUrl) URL.revokeObjectURL(blobUrl)
     }
-  }, [storagePath, fileName])
+  }, [storagePath, fileName, bucket])
 
   if (failed) {
     return (
       <p className="text-sm text-slate-500">
-        Kunne ikke laste forhåndsvisning. Bruk «Vis fil» i listen.
+        Kunne ikke laste forhåndsvisning.
       </p>
     )
   }
@@ -343,5 +350,27 @@ export function StoredReceiptPreview({
 
   return (
     <ExpandableReceiptPreview url={url} fileName={fileName} isPdf={isPdf} />
+  )
+}
+
+export function StoredReceiptPreview({
+  storagePath,
+}: {
+  storagePath: string
+}) {
+  return <StoredFilePreview storagePath={storagePath} bucket="receipts" emptyLabel="kvittering" />
+}
+
+export function StoredProjectAttachmentPreview({
+  storagePath,
+}: {
+  storagePath: string
+}) {
+  return (
+    <StoredFilePreview
+      storagePath={storagePath}
+      bucket={PROJECT_ATTACHMENTS_BUCKET}
+      emptyLabel="vedlegg"
+    />
   )
 }

@@ -128,6 +128,17 @@ export type BudgetItemWithActual = BudgetItem & {
   variance: number
 }
 
+export type ProjectAttachment = {
+  id: string
+  project_id: string
+  title: string
+  description: string
+  storage_path: string | null
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
 export type AuditLogEntry = {
   id: string
   project_id: string

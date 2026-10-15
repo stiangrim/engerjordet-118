@@ -93,7 +93,7 @@ I redigeringsmodus vises en sammenleggbar **Endringslogg** nederst på siden (hv
 
 ## Redigering i appen
 
-- **Oversikt** → *Rediger rammer*
+- **Oversikt** → *Notater og vedlegg* (tekst + valgfri PDF/bilde), *Rediger rammer*
 - **Budsjett** → *Rediger* / *Ny budsjettpost*
 - **Plan** → perioder, kritiske punkter, milepæler
 - **Kostnader** → kvitteringer, manuelle poster, mottakere

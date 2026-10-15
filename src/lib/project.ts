@@ -14,9 +14,12 @@ import type {
   CostEntry,
   Payee,
   PayeePayment,
+  ProjectAttachment,
   Receipt,
   SchedulePeriod,
 } from './types'
+
+export const PROJECT_ATTACHMENTS_BUCKET = 'project_attachments'
 
 export async function fetchProject(): Promise<Project | null> {
   const { data, error } = await supabase
@@ -47,6 +50,20 @@ export async function fetchReceipts(projectId: string): Promise<Receipt[]> {
     .select('*')
     .eq('project_id', projectId)
     .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return data ?? []
+}
+
+export async function fetchProjectAttachments(
+  projectId: string,
+): Promise<ProjectAttachment[]> {
+  const { data, error } = await supabase
+    .from('project_attachments')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true })
 
   if (error) throw error
   return data ?? []
@@ -284,6 +301,114 @@ export async function uploadReceiptFile(
   return path
 }
 
+export async function uploadProjectAttachmentFile(
+  projectId: string,
+  file: File,
+): Promise<string> {
+  const ext = file.name.split('.').pop() ?? 'bin'
+  const path = `${projectId}/${crypto.randomUUID()}.${ext}`
+  const { error } = await supabase.storage
+    .from(PROJECT_ATTACHMENTS_BUCKET)
+    .upload(path, file, {
+      cacheControl: '3600',
+      upsert: false,
+    })
+  if (error) throw error
+  return path
+}
+
+export type ProjectAttachmentWrite = {
+  title: string
+  description: string
+  storage_path?: string | null
+}
+
+async function nextAttachmentSortOrder(projectId: string): Promise<number> {
+  const { data } = await supabase
+    .from('project_attachments')
+    .select('sort_order')
+    .eq('project_id', projectId)
+    .order('sort_order', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  return (data?.sort_order ?? -1) + 1
+}
+
+export async function createProjectAttachment(
+  projectId: string,
+  input: ProjectAttachmentWrite,
+): Promise<ProjectAttachment> {
+  const sort_order = await nextAttachmentSortOrder(projectId)
+  const { data, error } = await supabase
+    .from('project_attachments')
+    .insert({
+      project_id: projectId,
+      title: input.title.trim(),
+      description: input.description.trim(),
+      storage_path: input.storage_path ?? null,
+      sort_order,
+    })
+    .select()
+    .single()
+  if (error) throw error
+  void recordAudit({
+    projectId,
+    action: 'create',
+    entityType: 'project_attachment',
+    entityId: data.id,
+    summary: `Nytt notat/vedlegg: ${input.title.trim().slice(0, 80)}`,
+  })
+  return data
+}
+
+export async function updateProjectAttachment(
+  id: string,
+  patch: Partial<ProjectAttachmentWrite>,
+): Promise<ProjectAttachment> {
+  const payload: Record<string, unknown> = { updated_at: new Date().toISOString() }
+  if (patch.title !== undefined) payload.title = patch.title.trim()
+  if (patch.description !== undefined) payload.description = patch.description.trim()
+  if (patch.storage_path !== undefined) payload.storage_path = patch.storage_path
+
+  const { data, error } = await supabase
+    .from('project_attachments')
+    .update(payload)
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  void recordAudit({
+    projectId: data.project_id,
+    action: 'update',
+    entityType: 'project_attachment',
+    entityId: data.id,
+    summary: `Oppdaterte notat/vedlegg: ${data.title.slice(0, 80)}`,
+  })
+  return data
+}
+
+export async function deleteProjectAttachment(
+  attachment: ProjectAttachment,
+): Promise<void> {
+  if (attachment.storage_path) {
+    await supabase.storage
+      .from(PROJECT_ATTACHMENTS_BUCKET)
+      .remove([attachment.storage_path])
+  }
+  const { error } = await supabase
+    .from('project_attachments')
+    .delete()
+    .eq('id', attachment.id)
+  if (error) throw error
+  void recordAudit({
+    projectId: attachment.project_id,
+    action: 'delete',
+    entityType: 'project_attachment',
+    entityId: attachment.id,
+    summary: `Slettet notat/vedlegg: ${attachment.title.slice(0, 80)}`,
+  })
+}
+
 export type PayeeWrite = {
   name: string
   extra_owed: number
@@ -497,14 +622,21 @@ export async function createReceipt(input: CreateReceiptInput): Promise<Receipt>
   return row
 }
 
-export async function signedReceiptUrl(
+export async function signedStorageUrl(
+  bucket: string,
   storagePath: string,
 ): Promise<string | null> {
   const { data, error } = await supabase.storage
-    .from('receipts')
+    .from(bucket)
     .createSignedUrl(storagePath, 3600)
   if (error) return null
   return data.signedUrl
+}
+
+export async function signedReceiptUrl(
+  storagePath: string,
+): Promise<string | null> {
+  return signedStorageUrl('receipts', storagePath)
 }
 
 export type ProjectUpdate = {
