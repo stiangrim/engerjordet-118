@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { downloadFileFromUrl, downloadLocalFile } from '../lib/fileDownload'
 import { PROJECT_ATTACHMENTS_BUCKET, signedReceiptUrl, signedStorageUrl } from '../lib/project'
 import {
   canPreviewReceiptFile,
@@ -68,6 +69,51 @@ function pdfViewerUrl(url: string): string {
   return url.includes('#') ? url : `${url}#${hash}`
 }
 
+export type FileDownloadSource =
+  | { kind: 'url'; url: string; fileName: string }
+  | { kind: 'file'; file: File }
+
+async function runDownload(source: FileDownloadSource): Promise<void> {
+  if (source.kind === 'file') {
+    downloadLocalFile(source.file)
+    return
+  }
+  await downloadFileFromUrl(source.url, source.fileName)
+}
+
+function DownloadFileButton({
+  source,
+  className,
+}: {
+  source: FileDownloadSource
+  className?: string
+}) {
+  const [busy, setBusy] = useState(false)
+
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={() => {
+        setBusy(true)
+        void runDownload(source)
+          .catch(() => {
+            if (source.kind === 'url') {
+              window.open(source.url, '_blank', 'noopener,noreferrer')
+            }
+          })
+          .finally(() => setBusy(false))
+      }}
+      className={
+        className ??
+        'shrink-0 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-800 hover:bg-slate-100 disabled:opacity-50'
+      }
+    >
+      {busy ? 'Laster …' : 'Last ned'}
+    </button>
+  )
+}
+
 type PreviewFrameProps = {
   url: string
   isPdf: boolean
@@ -111,11 +157,13 @@ function FullscreenPreview({
   url,
   isPdf,
   fileName,
+  download,
   onClose,
 }: {
   url: string
   isPdf: boolean
   fileName: string
+  download: FileDownloadSource
   onClose: () => void
 }) {
   useEffect(() => {
@@ -147,7 +195,7 @@ function FullscreenPreview({
         onClick={(e) => e.stopPropagation()}
       >
         <p className="truncate text-sm font-medium text-white">{fileName}</p>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/20"
@@ -155,6 +203,10 @@ function FullscreenPreview({
           >
             Ny fane
           </button>
+          <DownloadFileButton
+            source={download}
+            className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/20 disabled:opacity-50"
+          />
           <button
             type="button"
             className="rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-100"
@@ -185,11 +237,13 @@ export function ExpandableReceiptPreview({
   fileName,
   isPdf,
   className,
+  download,
 }: {
   url: string
   fileName: string
   isPdf: boolean
   className?: string
+  download: FileDownloadSource
 }) {
   const [expanded, setExpanded] = useState(false)
 
@@ -199,14 +253,17 @@ export function ExpandableReceiptPreview({
         className={`overflow-hidden rounded-lg border border-slate-200 bg-white ${className ?? ''}`}
       >
         <div className="flex items-center justify-between gap-2 border-b border-slate-100 bg-slate-50 px-3 py-2">
-          <span className="truncate text-xs text-slate-600">{fileName}</span>
-          <button
-            type="button"
-            onClick={() => setExpanded(true)}
-            className="shrink-0 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-800 hover:bg-slate-100"
-          >
-            Forstørre
-          </button>
+          <span className="min-w-0 truncate text-xs text-slate-600">{fileName}</span>
+          <div className="flex shrink-0 gap-1.5">
+            <DownloadFileButton source={download} />
+            <button
+              type="button"
+              onClick={() => setExpanded(true)}
+              className="shrink-0 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-800 hover:bg-slate-100"
+            >
+              Forstørre
+            </button>
+          </div>
         </div>
         {isPdf ? (
           <iframe
@@ -236,6 +293,7 @@ export function ExpandableReceiptPreview({
           url={url}
           isPdf={isPdf}
           fileName={fileName}
+          download={download}
           onClose={() => setExpanded(false)}
         />
       ) : null}
@@ -271,6 +329,7 @@ export function LocalReceiptPreview({ file }: { file: File }) {
       fileName={file.name}
       isPdf={isPdf}
       className="mt-3"
+      download={{ kind: 'file', file }}
     />
   )
 }
@@ -285,6 +344,7 @@ export function StoredFilePreview({
   emptyLabel?: string
 }) {
   const [url, setUrl] = useState<string | null>(null)
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
   const [loading, setLoading] = useState(true)
   const fileName = storagePath.split('/').pop() ?? emptyLabel
@@ -296,6 +356,7 @@ export function StoredFilePreview({
     let blobUrl: string | null = null
     setFailed(false)
     setUrl(null)
+    setDownloadUrl(null)
     setLoading(true)
 
     void (async () => {
@@ -309,6 +370,7 @@ export function StoredFilePreview({
         setLoading(false)
         return
       }
+      setDownloadUrl(signed)
       try {
         const previewUrl = await previewObjectUrlForRemote(signed, fileName)
         if (cancelled) {
@@ -346,10 +408,15 @@ export function StoredFilePreview({
       </p>
     )
   }
-  if (!url) return null
+  if (!url || !downloadUrl) return null
 
   return (
-    <ExpandableReceiptPreview url={url} fileName={fileName} isPdf={isPdf} />
+    <ExpandableReceiptPreview
+      url={url}
+      fileName={fileName}
+      isPdf={isPdf}
+      download={{ kind: 'url', url: downloadUrl, fileName }}
+    />
   )
 }
 
