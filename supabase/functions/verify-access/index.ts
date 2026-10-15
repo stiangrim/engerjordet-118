@@ -114,6 +114,9 @@ Deno.serve(async (req) => {
   if (!sessionSecret || (!full && !ro)) {
     return json({ error: "not_configured" }, 503)
   }
+  if (full.length > 0 && ro.length > 0 && timingEqual(full, ro)) {
+    return json({ error: "passwords_must_differ" }, 503)
+  }
 
   let body: Body
   try {

@@ -36,11 +36,15 @@ Sett `VITE_ACCESS_AUTH=true` for innlogging. Passord ligger **ikke** i frontend 
 supabase functions deploy verify-access
 supabase secrets set \
   ACCESS_SESSION_SECRET="$(openssl rand -hex 32)" \
-  ACCESS_PASSWORD_READONLY="ditt-les-passord" \
+  ACCESS_PASSWORD_READONLY="ditt-enkle-les-passord" \
   ACCESS_PASSWORD_FULL="ditt-rediger-passord"
 ```
 
-Samme passord gir full tilgang hvis du kun setter `ACCESS_PASSWORD_FULL`. Restart `npm run dev` etter env-endringer.
+**Les** og **rediger** må ha **ulike** passord (les kan være enkelt). Hvis de er like, avviser `verify-access` innlogging.
+
+Oppdater lesepassord: `supabase secrets set ACCESS_PASSWORD_READONLY="…"`
+
+Restart `npm run dev` etter env-endringer.
 
 ## Database
 

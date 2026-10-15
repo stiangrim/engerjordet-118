@@ -88,6 +88,10 @@ function LoginScreen({
           {projectTitle}
         </p>
         <h1 className="mt-1 text-xl font-semibold text-slate-900">Logg inn</h1>
+        <p className="mt-2 text-sm text-slate-600">
+          Gjestpassord gir kun lesing. Redigeringspassord er et annet, sterkere
+          passord.
+        </p>
         <form onSubmit={onSubmit} className="mt-6 space-y-4">
           <label className="block text-sm">
             <span className="font-medium text-slate-800">Passord</span>
