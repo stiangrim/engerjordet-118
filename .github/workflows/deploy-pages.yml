@@ -30,6 +30,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_ACCESS_AUTH: ${{ secrets.VITE_ACCESS_AUTH }}
+          VITE_APP_TITLE: ${{ secrets.VITE_APP_TITLE }}
           VITE_BASE_PATH: /engerjordet-118/
       - name: SPA fallback for GitHub Pages
         run: cp dist/index.html dist/404.html
