@@ -1,4 +1,10 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+
+function routerBasename(): string | undefined {
+  const base = import.meta.env.BASE_URL
+  if (!base || base === '/') return undefined
+  return base.endsWith('/') ? base.slice(0, -1) : base
+}
 import { AccessProvider } from './access/AccessContext'
 import { AccessGate } from './components/AccessGate'
 import { Layout } from './components/Layout'
@@ -11,7 +17,7 @@ function App() {
   return (
     <AccessProvider>
       <AccessGate>
-        <BrowserRouter>
+        <BrowserRouter basename={routerBasename()}>
           <Routes>
             <Route element={<Layout />}>
               <Route index element={<OverviewPage />} />

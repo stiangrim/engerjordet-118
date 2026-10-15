@@ -57,25 +57,21 @@ Det oppretter tabeller, RLS, storage-bucket `receipts`, og seed-data fra Excel (
 
 Last opp kvitteringer under **Kostnader** i appen. Beløp registreres **inkl. mva**. Filene lagres i Supabase Storage og kan knyttes til budsjettposter.
 
-## Publisering (Vercel)
+## Publisering
 
-Appen er en statisk Vite-build. Anbefalt hosting: [Vercel](https://vercel.com).
+**Produksjon (GitHub Pages):** https://stiangrim.github.io/engerjordet-118/
 
-1. Push prosjektet til GitHub (eller Cursor Origin).
-2. Importer repoet i Vercel → **Framework Preset: Vite**.
-3. Sett **Environment Variables** (Production + Preview):
+Ved push til `main` bygger [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml) og publiserer automatisk. Repo-secrets (Settings → Secrets → Actions):
 
-| Variabel | Verdi |
-|----------|--------|
+| Secret | Innhold |
+|--------|---------|
 | `VITE_SUPABASE_URL` | Supabase API URL |
 | `VITE_SUPABASE_ANON_KEY` | Supabase anon key |
-| `VITE_ACCESS_AUTH` | `true` hvis innlogging skal være på |
+| `VITE_ACCESS_AUTH` | `true` |
 
-4. Deploy. `vercel.json` sørger for SPA-routing (`/budsjett`, `/kostnader`, osv.).
+Passord til innlogging ligger kun i Supabase Function-secrets (`verify-access`).
 
-Passord til innlogging ligger fortsatt kun i Supabase Function-secrets (`verify-access`), ikke i Vercel.
-
-Etter første deploy: i Supabase **Authentication → URL configuration** (eller CORS der det gjelder) er det ofte ikke nødvendig for anon + Edge Functions; test kvitteringsopplasting mot Storage fra produksjonsdomenet.
+**Alternativ:** `vercel.json` finnes for Vercel (root-domene, ingen `/engerjordet-118/`-base). Importer [github.com/stiangrim/engerjordet-118](https://github.com/stiangrim/engerjordet-118) og sett samme env-variabler der.
 
 ## Redigering i appen
 
