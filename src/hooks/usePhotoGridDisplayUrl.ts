@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { photoGridDisplayUrl } from '../lib/photoGridDisplayUrl'
+import {
+  invalidatePhotoGridUrls,
+  photoGridDisplayUrl,
+} from '../lib/photoGridDisplayUrl'
 import type { ProjectPhoto } from '../lib/types'
 
 export function usePhotoGridDisplayUrl(photo: ProjectPhoto): {
@@ -24,18 +27,35 @@ export function usePhotoGridDisplayUrl(photo: ProjectPhoto): {
       if (started || cancelled) return
       started = true
       setLoading(true)
-      void photoGridDisplayUrl(photo).then((next) => {
-        if (cancelled) {
-          if (next?.startsWith('blob:')) URL.revokeObjectURL(next)
-          return
-        }
-        if (blobUrlRef.current?.startsWith('blob:')) {
-          URL.revokeObjectURL(blobUrlRef.current)
-        }
-        blobUrlRef.current = next?.startsWith('blob:') ? next : null
-        setUrl(next)
-        setLoading(false)
-      })
+
+      const attemptLoad = (attempt: number) => {
+        if (cancelled) return
+        if (attempt > 0) invalidatePhotoGridUrls(photo)
+
+        void photoGridDisplayUrl(photo).then((next) => {
+          if (cancelled) {
+            if (next?.startsWith('blob:')) URL.revokeObjectURL(next)
+            return
+          }
+          if (next) {
+            if (blobUrlRef.current?.startsWith('blob:')) {
+              URL.revokeObjectURL(blobUrlRef.current)
+            }
+            blobUrlRef.current = next.startsWith('blob:') ? next : null
+            setUrl(next)
+            setLoading(false)
+            return
+          }
+          if (attempt < 2) {
+            window.setTimeout(() => attemptLoad(attempt + 1), 800 * (attempt + 1))
+            return
+          }
+          setUrl(null)
+          setLoading(false)
+        })
+      }
+
+      attemptLoad(0)
     }
 
     const observer = new IntersectionObserver(
@@ -61,6 +81,7 @@ export function usePhotoGridDisplayUrl(photo: ProjectPhoto): {
     url,
     loading,
     retry: () => {
+      invalidatePhotoGridUrls(photo)
       setUrl(null)
       setRetryKey((k) => k + 1)
     },

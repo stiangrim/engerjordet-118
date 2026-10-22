@@ -190,7 +190,15 @@ function PhotoGridTile({
           className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
         />
       ) : (
-        <span className="flex h-full items-center justify-center bg-slate-300 text-xs text-slate-600">
+        <span
+          className="flex h-full items-center justify-center bg-slate-300 text-xs text-slate-600"
+          onClick={(e) => {
+            if (!loading) {
+              e.stopPropagation()
+              retry()
+            }
+          }}
+        >
           {loading ? '…' : isVideo ? 'Video' : '?'}
         </span>
       )}

@@ -59,3 +59,7 @@ export async function getSignedStorageUrl(
     return null
   })
 }
+
+export function invalidateSignedStorageUrl(bucket: string, path: string): void {
+  cache.delete(cacheKey(bucket, path))
+}
