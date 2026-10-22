@@ -1,21 +1,19 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useCanWrite } from '../access/AccessContext'
 import { CanWrite } from '../components/CanWrite'
 import { LoadState } from '../components/LoadState'
+import { BulkPhotoUploadDialog } from '../components/BulkPhotoUploadDialog'
 import { PhotoLightbox } from '../components/PhotoLightbox'
-import { mapWithConcurrency } from '../lib/asyncPool'
 import { formatNorwegianPhotoSectionHeader } from '../lib/dates'
 import { formatLoadError } from '../lib/errors'
-import { groupPhotosByDay, isGalleryUploadFile } from '../lib/photoGroups'
+import { groupPhotosByDay } from '../lib/photoGroups'
 import { projectPhotoMediaKind } from '../lib/projectMedia'
 import {
   deleteProjectPhoto,
   fetchProject,
   fetchProjectPhotos,
   PROJECT_PHOTOS_BUCKET,
-  recordProjectPhotosBulkAudit,
 } from '../lib/project'
-import { uploadProjectPhotoFile } from '../lib/uploadProjectPhoto'
 import { useSignedStorageUrl } from '../hooks/useSignedStorageUrl'
 import type { ProjectPhoto } from '../lib/types'
 
@@ -136,16 +134,11 @@ function PhotosContent({
         </div>
       )}
 
-      {uploadOpen ? (
-        <BulkPhotoUploadPanel
-          onClose={() => setUploadOpen(false)}
-          onDone={(projectId, count) => {
-            setUploadOpen(false)
-            if (count > 0) void recordProjectPhotosBulkAudit(projectId, count)
-            onChanged()
-          }}
-        />
-      ) : null}
+      <BulkPhotoUploadDialog
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        onUploaded={onChanged}
+      />
 
       {lightboxIndex !== null ? (
         <PhotoLightbox
@@ -221,142 +214,6 @@ function PhotoGridTile({
           Slett
         </button>
       ) : null}
-    </div>
-  )
-}
-
-function BulkPhotoUploadPanel({
-  onClose,
-  onDone,
-}: {
-  onClose: () => void
-  onDone: (projectId: string, uploadedCount: number) => void
-}) {
-  const inputId = useId()
-  const inputRef = useRef<HTMLInputElement>(null)
-  const [dragOver, setDragOver] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [progress, setProgress] = useState({ done: 0, total: 0 })
-  const [errors, setErrors] = useState<string[]>([])
-
-  async function handleFiles(fileList: FileList | File[]) {
-    const files = [...fileList].filter(isGalleryUploadFile)
-    if (files.length === 0) return
-
-    const project = await fetchProject()
-    if (!project) return
-
-    setBusy(true)
-    setErrors([])
-    setProgress({ done: 0, total: files.length })
-
-    const failed: string[] = []
-    let uploaded = 0
-
-    await mapWithConcurrency(files, 3, async (file) => {
-      try {
-        await uploadProjectPhotoFile(project.id, file)
-        uploaded += 1
-      } catch {
-        failed.push(file.name)
-      } finally {
-        setProgress((p) => ({ ...p, done: p.done + 1 }))
-      }
-    })
-
-    setBusy(false)
-    setErrors(failed.map((n) => `Kunne ikke laste opp: ${n}`))
-    if (uploaded > 0) onDone(project.id, uploaded)
-    else if (failed.length === 0) onClose()
-  }
-
-  return (
-    <div className="fixed inset-0 z-[65] flex items-end justify-center bg-slate-950/50 p-4 sm:items-center">
-      <div
-        className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-5 shadow-xl"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="bulk-upload-title"
-      >
-        <h3 id="bulk-upload-title" className="text-lg font-semibold">
-          Last opp bilder og video
-        </h3>
-        <input
-          ref={inputRef}
-          id={inputId}
-          type="file"
-          accept="image/*,.heic,.heif,video/*,.mp4,.mov,.m4v,.webm"
-          multiple
-          className="sr-only"
-          disabled={busy}
-          onChange={(e) => {
-            const list = e.target.files
-            if (list?.length) void handleFiles(list)
-            e.target.value = ''
-          }}
-        />
-
-        <div
-          onDragEnter={(e) => {
-            e.preventDefault()
-            if (!busy) setDragOver(true)
-          }}
-          onDragLeave={(e) => {
-            e.preventDefault()
-            setDragOver(false)
-          }}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            e.preventDefault()
-            setDragOver(false)
-            if (busy) return
-            const dropped = e.dataTransfer.files
-            if (dropped?.length) void handleFiles(dropped)
-          }}
-          className={`mt-4 rounded-xl border-2 border-dashed px-4 py-10 text-center ${
-            dragOver ? 'border-slate-500 bg-slate-100' : 'border-slate-300 bg-slate-50'
-          } ${busy ? 'opacity-60' : ''}`}
-        >
-          {busy ? (
-            <p className="text-sm font-medium text-slate-800">
-              Laster opp … {progress.done} / {progress.total}
-            </p>
-          ) : (
-            <>
-              <p className="text-sm font-medium text-slate-800">
-                Dra bilder og video hit, eller velg fra enheten
-              </p>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => inputRef.current?.click()}
-                className="mt-4 rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
-              >
-                Velg filer
-              </button>
-            </>
-          )}
-        </div>
-
-        {errors.length > 0 ? (
-          <ul className="mt-3 max-h-24 overflow-auto text-sm text-red-700">
-            {errors.map((msg) => (
-              <li key={msg}>{msg}</li>
-            ))}
-          </ul>
-        ) : null}
-
-        <div className="mt-4 flex justify-end">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onClose}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:opacity-50"
-          >
-            {busy ? 'Vent …' : 'Lukk'}
-          </button>
-        </div>
-      </div>
     </div>
   )
 }

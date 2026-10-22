@@ -63,6 +63,17 @@ export function formatNorwegianDateTime(iso: string | null | undefined): string 
 }
 
 /** Galleri: «Fredag 15. oktober 2026» fra tatt-tid (ISO). */
+/** «ca. 2 min» / «under 1 min» for opplastings-ETA. */
+export function formatRoughDurationMs(ms: number): string {
+  if (!Number.isFinite(ms) || ms <= 0) return ''
+  const sec = Math.ceil(ms / 1000)
+  if (sec < 60) return 'under 1 min'
+  const min = Math.ceil(sec / 60)
+  if (min < 60) return min === 1 ? 'ca. 1 min' : `ca. ${min} min`
+  const hours = Math.ceil(min / 60)
+  return hours === 1 ? 'ca. 1 time' : `ca. ${hours} timer`
+}
+
 export function formatNorwegianPhotoSectionHeader(iso: string): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return 'Ukjent dato'

@@ -6,6 +6,7 @@ import {
   type ProjectPhotoWrite,
 } from './project'
 import { isVideoUploadFile } from './projectMedia'
+import { throwIfCancelled } from './uploadCancelled'
 import type { ProjectPhoto } from './types'
 
 function storageExtension(file: File): string {
@@ -23,24 +24,32 @@ function storageExtension(file: File): string {
 export async function uploadProjectPhotoFile(
   projectId: string,
   file: File,
+  isCancelled?: () => boolean,
 ): Promise<ProjectPhoto> {
-  const takenAt = await readPhotoTakenAt(file)
-  const dimensions = await readPhotoDimensions(file)
+  throwIfCancelled(isCancelled)
+
+  const [takenAt, dimensions] = await Promise.all([
+    readPhotoTakenAt(file),
+    readPhotoDimensions(file),
+  ])
+  throwIfCancelled(isCancelled)
+
   const fileId = crypto.randomUUID()
   const storage_path = `${projectId}/${fileId}.${storageExtension(file)}`
 
+  const thumbPromise = createPhotoThumbnail(file).catch(() => null)
+
   await uploadProjectPhotoStorage(storage_path, file)
+  throwIfCancelled(isCancelled)
 
   let thumb_path: string | null = null
-  try {
-    const thumb = await createPhotoThumbnail(file)
-    if (thumb) {
-      thumb_path = `${projectId}/${fileId}_thumb.jpg`
-      await uploadProjectPhotoStorage(thumb_path, thumb, 'image/jpeg')
-    }
-  } catch {
-    /* miniatyr er valgfri */
+  const thumb = await thumbPromise
+  throwIfCancelled(isCancelled)
+  if (thumb) {
+    thumb_path = `${projectId}/${fileId}_thumb.jpg`
+    await uploadProjectPhotoStorage(thumb_path, thumb, 'image/jpeg')
   }
+  throwIfCancelled(isCancelled)
 
   const write: ProjectPhotoWrite = {
     storage_path,
