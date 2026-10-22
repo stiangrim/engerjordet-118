@@ -62,6 +62,13 @@ export function formatNorwegianDateTime(iso: string | null | undefined): string 
   return dateTimeFormatter.format(d)
 }
 
+/** Galleri: «Fredag 15. oktober 2026» fra tatt-tid (ISO). */
+export function formatNorwegianPhotoSectionHeader(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return 'Ukjent dato'
+  return capitalizeFirst(longDateFormatter.format(d))
+}
+
 export function formatNorwegianDateRange(
   start: string | null | undefined,
   end: string | null | undefined,

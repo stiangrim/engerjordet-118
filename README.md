@@ -94,6 +94,7 @@ I redigeringsmodus vises en sammenleggbar **Endringslogg** nederst på siden (hv
 ## Redigering i appen
 
 - **Oversikt** → *Notater og vedlegg* (tekst + valgfri PDF/bilde), *Rediger rammer*
+- **Bilder** → bulk-opplasting, galleri gruppert etter tatt-dato (EXIF)
 - **Budsjett** → *Rediger* / *Ny budsjettpost*
 - **Plan** → perioder, kritiske punkter, milepæler
 - **Kostnader** → kvitteringer, manuelle poster, mottakere

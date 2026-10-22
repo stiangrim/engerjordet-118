@@ -6,6 +6,7 @@ import { BudgetPage } from './pages/Budget'
 import { OverviewPage } from './pages/Overview'
 import { PlanPage } from './pages/Plan'
 import { CostsPage } from './pages/Receipts'
+import { PhotosPage } from './pages/Photos'
 
 function routerBasename(): string | undefined {
   const base = import.meta.env.BASE_URL
@@ -24,6 +25,7 @@ function App() {
                 <Route path="budsjett" element={<BudgetPage />} />
                 <Route path="plan" element={<PlanPage />} />
                 <Route path="kostnader" element={<CostsPage />} />
+                <Route path="bilder" element={<PhotosPage />} />
                 <Route
                   path="kvitteringer"
                   element={<Navigate to="/kostnader" replace />}

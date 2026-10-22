@@ -139,6 +139,19 @@ export type ProjectAttachment = {
   updated_at: string
 }
 
+export type ProjectPhoto = {
+  id: string
+  project_id: string
+  storage_path: string
+  thumb_path: string | null
+  taken_at: string
+  caption: string
+  width: number | null
+  height: number | null
+  created_at: string
+  updated_at: string
+}
+
 export type AuditLogEntry = {
   id: string
   project_id: string

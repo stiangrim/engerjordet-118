@@ -15,11 +15,13 @@ import type {
   Payee,
   PayeePayment,
   ProjectAttachment,
+  ProjectPhoto,
   Receipt,
   SchedulePeriod,
 } from './types'
 
 export const PROJECT_ATTACHMENTS_BUCKET = 'project_attachments'
+export const PROJECT_PHOTOS_BUCKET = 'project_photos'
 
 export async function fetchProject(): Promise<Project | null> {
   const { data, error } = await supabase
@@ -64,6 +66,19 @@ export async function fetchProjectAttachments(
     .eq('project_id', projectId)
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: true })
+
+  if (error) throw error
+  return data ?? []
+}
+
+export async function fetchProjectPhotos(
+  projectId: string,
+): Promise<ProjectPhoto[]> {
+  const { data, error } = await supabase
+    .from('project_photos')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('taken_at', { ascending: false })
 
   if (error) throw error
   return data ?? []
@@ -406,6 +421,113 @@ export async function deleteProjectAttachment(
     entityType: 'project_attachment',
     entityId: attachment.id,
     summary: `Slettet notat/vedlegg: ${attachment.title.slice(0, 80)}`,
+  })
+}
+
+export async function uploadProjectPhotoStorage(
+  path: string,
+  body: File | Blob,
+  contentType?: string,
+): Promise<void> {
+  const { error } = await supabase.storage
+    .from(PROJECT_PHOTOS_BUCKET)
+    .upload(path, body, {
+      cacheControl: '3600',
+      upsert: false,
+      contentType: contentType ?? (body instanceof File ? body.type : undefined),
+    })
+  if (error) throw error
+}
+
+export type ProjectPhotoWrite = {
+  storage_path: string
+  thumb_path?: string | null
+  taken_at: string
+  caption?: string
+  width?: number | null
+  height?: number | null
+}
+
+export async function createProjectPhoto(
+  projectId: string,
+  input: ProjectPhotoWrite,
+): Promise<ProjectPhoto> {
+  const { data, error } = await supabase
+    .from('project_photos')
+    .insert({
+      project_id: projectId,
+      storage_path: input.storage_path,
+      thumb_path: input.thumb_path ?? null,
+      taken_at: input.taken_at,
+      caption: input.caption?.trim() ?? '',
+      width: input.width ?? null,
+      height: input.height ?? null,
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateProjectPhoto(
+  id: string,
+  patch: Partial<Pick<ProjectPhotoWrite, 'caption' | 'taken_at'>>,
+): Promise<ProjectPhoto> {
+  const payload: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  }
+  if (patch.caption !== undefined) payload.caption = patch.caption.trim()
+  if (patch.taken_at !== undefined) payload.taken_at = patch.taken_at
+
+  const { data, error } = await supabase
+    .from('project_photos')
+    .update(payload)
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  void recordAudit({
+    projectId: data.project_id,
+    action: 'update',
+    entityType: 'project_photo',
+    entityId: data.id,
+    summary: 'Oppdaterte prosjektbilde',
+  })
+  return data
+}
+
+export async function deleteProjectPhoto(photo: ProjectPhoto): Promise<void> {
+  const paths = [photo.storage_path, photo.thumb_path].filter(
+    (p): p is string => Boolean(p),
+  )
+  if (paths.length > 0) {
+    await supabase.storage.from(PROJECT_PHOTOS_BUCKET).remove(paths)
+  }
+  const { error } = await supabase.from('project_photos').delete().eq('id', photo.id)
+  if (error) throw error
+  void recordAudit({
+    projectId: photo.project_id,
+    action: 'delete',
+    entityType: 'project_photo',
+    entityId: photo.id,
+    summary: 'Slettet prosjektbilde',
+  })
+}
+
+export async function recordProjectPhotosBulkAudit(
+  projectId: string,
+  count: number,
+): Promise<void> {
+  if (count <= 0) return
+  void recordAudit({
+    projectId,
+    action: 'create',
+    entityType: 'project_photo',
+    entityId: null,
+    summary:
+      count === 1
+        ? 'Lastet opp 1 prosjektbilde'
+        : `Lastet opp ${count} prosjektbilder`,
   })
 }
 
