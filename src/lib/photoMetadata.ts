@@ -1,20 +1,38 @@
 import exifr from 'exifr'
+import { isVideoUploadFile } from './projectMedia'
 
 export type PhotoDimensions = { width: number; height: number }
 
-/** Tatt-tid fra EXIF (DateTimeOriginal), ellers fil-metadata. */
+function firstValidDate(...values: unknown[]): Date | null {
+  for (const v of values) {
+    if (v instanceof Date && !Number.isNaN(v.getTime())) return v
+  }
+  return null
+}
+
+/** Tatt-tid fra EXIF / video-metadata, ellers fil-metadata. */
 export async function readPhotoTakenAt(file: File): Promise<Date> {
   try {
-    const parsed = await exifr.parse(file, {
-      pick: ['DateTimeOriginal', 'CreateDate', 'ModifyDate'],
-    })
-    const candidate =
-      parsed?.DateTimeOriginal ?? parsed?.CreateDate ?? parsed?.ModifyDate
-    if (candidate instanceof Date && !Number.isNaN(candidate.getTime())) {
-      return candidate
-    }
+    const pick = isVideoUploadFile(file)
+      ? [
+          'MediaCreateDate',
+          'CreateDate',
+          'ModifyDate',
+          'DateTimeOriginal',
+          'TrackCreateDate',
+        ]
+      : ['DateTimeOriginal', 'CreateDate', 'ModifyDate', 'MediaCreateDate']
+    const parsed = await exifr.parse(file, { pick })
+    const candidate = firstValidDate(
+      parsed?.DateTimeOriginal,
+      parsed?.MediaCreateDate,
+      parsed?.TrackCreateDate,
+      parsed?.CreateDate,
+      parsed?.ModifyDate,
+    )
+    if (candidate) return candidate
   } catch {
-    /* EXIF mangler eller uleselig */
+    /* metadata mangler eller uleselig */
   }
   if (file.lastModified > 0) {
     return new Date(file.lastModified)
@@ -25,6 +43,9 @@ export async function readPhotoTakenAt(file: File): Promise<Date> {
 export async function readPhotoDimensions(
   file: File,
 ): Promise<PhotoDimensions | null> {
+  if (isVideoUploadFile(file)) {
+    return dimensionsFromVideoFile(file)
+  }
   try {
     const dims = await exifr.parse(file, { pick: ['ImageWidth', 'ImageHeight'] })
     const w = Number(dims?.ImageWidth)
@@ -38,6 +59,25 @@ export async function readPhotoDimensions(
   } catch {
     return null
   }
+}
+
+function dimensionsFromVideoFile(file: File): Promise<PhotoDimensions | null> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file)
+    const video = document.createElement('video')
+    video.preload = 'metadata'
+    video.onloadedmetadata = () => {
+      URL.revokeObjectURL(url)
+      if (video.videoWidth > 0 && video.videoHeight > 0) {
+        resolve({ width: video.videoWidth, height: video.videoHeight })
+      } else resolve(null)
+    }
+    video.onerror = () => {
+      URL.revokeObjectURL(url)
+      resolve(null)
+    }
+    video.src = url
+  })
 }
 
 function dimensionsFromImageFile(file: File): Promise<PhotoDimensions> {

@@ -526,8 +526,8 @@ export async function recordProjectPhotosBulkAudit(
     entityId: null,
     summary:
       count === 1
-        ? 'Lastet opp 1 prosjektbilde'
-        : `Lastet opp ${count} prosjektbilder`,
+        ? 'Lastet opp 1 bilde/video'
+        : `Lastet opp ${count} bilder/video`,
   })
 }
 

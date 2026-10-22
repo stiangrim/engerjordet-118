@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useCanWrite } from '../access/AccessContext'
 import { CanWrite } from '../components/CanWrite'
 import { LoadState } from '../components/LoadState'
 import { PhotoLightbox } from '../components/PhotoLightbox'
 import { mapWithConcurrency } from '../lib/asyncPool'
 import { formatNorwegianPhotoSectionHeader } from '../lib/dates'
 import { formatLoadError } from '../lib/errors'
-import { groupPhotosByDay, isImageUploadFile } from '../lib/photoGroups'
+import { groupPhotosByDay, isGalleryUploadFile } from '../lib/photoGroups'
+import { projectPhotoMediaKind } from '../lib/projectMedia'
 import {
+  deleteProjectPhoto,
   fetchProject,
   fetchProjectPhotos,
   PROJECT_PHOTOS_BUCKET,
@@ -67,6 +70,13 @@ function PhotosContent({
   )
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const [uploadOpen, setUploadOpen] = useState(false)
+  const canWrite = useCanWrite()
+
+  async function deletePhoto(photo: ProjectPhoto) {
+    if (!confirm('Slette denne filen permanent?')) return
+    await deleteProjectPhoto(photo)
+    onChanged()
+  }
 
   function openPhoto(photo: ProjectPhoto) {
     const idx = flatPhotos.findIndex((p) => p.id === photo.id)
@@ -77,11 +87,11 @@ function PhotosContent({
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Bilder</h2>
+          <h2 className="text-lg font-semibold">Bilder og video</h2>
           <p className="text-sm text-slate-600">
             {photos.length}{' '}
-            {photos.length === 1 ? 'bilde' : 'bilder'} · gruppert etter når de
-            er tatt (EXIF)
+            {photos.length === 1 ? 'fil' : 'filer'} · gruppert etter tatt-dato
+            (EXIF / fil-metadata)
           </p>
         </div>
         <CanWrite>
@@ -90,15 +100,15 @@ function PhotosContent({
             onClick={() => setUploadOpen(true)}
             className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
           >
-            Last opp bilder
+            Last opp
           </button>
         </CanWrite>
       </div>
 
       {photos.length === 0 ? (
         <p className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-12 text-center text-sm text-slate-500">
-          Ingen bilder ennå. Last opp mange på én gang – de sorteres etter dato
-          fra kameraet.
+          Ingen bilder eller video ennå. Last opp mange på én gang – de sorteres
+          etter når de er tatt.
         </p>
       ) : (
         <div className="space-y-8">
@@ -113,7 +123,12 @@ function PhotosContent({
               <ul className="grid grid-cols-2 gap-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                 {group.photos.map((photo) => (
                   <li key={photo.id}>
-                    <PhotoGridTile photo={photo} onOpen={() => openPhoto(photo)} />
+                    <PhotoGridTile
+                      photo={photo}
+                      onOpen={() => openPhoto(photo)}
+                      canDelete={canWrite}
+                      onDelete={() => void deletePhoto(photo)}
+                    />
                   </li>
                 ))}
               </ul>
@@ -149,33 +164,65 @@ function PhotosContent({
 function PhotoGridTile({
   photo,
   onOpen,
+  canDelete,
+  onDelete,
 }: {
   photo: ProjectPhoto
   onOpen: () => void
+  canDelete: boolean
+  onDelete: () => void
 }) {
-  const path = photo.thumb_path ?? photo.storage_path
-  const { url, loading } = useSignedStorageUrl(PROJECT_PHOTOS_BUCKET, path)
+  const isVideo = projectPhotoMediaKind(photo) === 'video'
+  const thumbPath =
+    photo.thumb_path ??
+    (isVideo ? null : photo.storage_path)
+  const { url, loading } = useSignedStorageUrl(PROJECT_PHOTOS_BUCKET, thumbPath)
 
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="group relative aspect-square w-full overflow-hidden rounded-sm bg-slate-200 ring-0 transition hover:ring-2 hover:ring-slate-900/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500"
-    >
+    <div className="group relative aspect-square w-full">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="relative h-full w-full overflow-hidden rounded-sm bg-slate-200 ring-0 transition hover:ring-2 hover:ring-slate-900/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500"
+      >
       {url ? (
         <img
           src={url}
-          alt={photo.caption.trim() || 'Prosjektbilde'}
+          alt={photo.caption.trim() || (isVideo ? 'Prosjektvideo' : 'Prosjektbilde')}
           loading="lazy"
           decoding="async"
           className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
         />
       ) : (
-        <span className="flex h-full items-center justify-center text-xs text-slate-500">
-          {loading ? '…' : '?'}
+        <span className="flex h-full items-center justify-center bg-slate-300 text-xs text-slate-600">
+          {loading ? '…' : isVideo ? 'Video' : '?'}
         </span>
       )}
-    </button>
+      {isVideo ? (
+        <span
+          className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-900/25"
+          aria-hidden
+        >
+          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-md">
+            ▶
+          </span>
+        </span>
+      ) : null}
+      </button>
+      {canDelete ? (
+        <button
+          type="button"
+          aria-label="Slett"
+          onClick={(e) => {
+            e.stopPropagation()
+            onDelete()
+          }}
+          className="absolute top-1 right-1 z-10 rounded-md bg-black/55 px-2 py-1 text-xs font-medium text-white opacity-0 transition hover:bg-red-700 group-hover:opacity-100 focus-visible:opacity-100"
+        >
+          Slett
+        </button>
+      ) : null}
+    </div>
   )
 }
 
@@ -194,7 +241,7 @@ function BulkPhotoUploadPanel({
   const [errors, setErrors] = useState<string[]>([])
 
   async function handleFiles(fileList: FileList | File[]) {
-    const files = [...fileList].filter(isImageUploadFile)
+    const files = [...fileList].filter(isGalleryUploadFile)
     if (files.length === 0) return
 
     const project = await fetchProject()
@@ -233,18 +280,18 @@ function BulkPhotoUploadPanel({
         aria-labelledby="bulk-upload-title"
       >
         <h3 id="bulk-upload-title" className="text-lg font-semibold">
-          Last opp bilder
+          Last opp bilder og video
         </h3>
         <p className="mt-1 text-sm text-slate-600">
-          Velg mange filer samtidig. Dato hentes fra EXIF (DateTimeOriginal) når
-          den finnes.
+          Velg mange filer samtidig. Dato hentes fra EXIF / video-metadata når
+          den finnes (f.eks. iPhone .mov).
         </p>
 
         <input
           ref={inputRef}
           id={inputId}
           type="file"
-          accept="image/*,.heic,.heif"
+          accept="image/*,.heic,.heif,video/*,.mp4,.mov,.m4v,.webm"
           multiple
           className="sr-only"
           disabled={busy}
@@ -283,7 +330,7 @@ function BulkPhotoUploadPanel({
           ) : (
             <>
               <p className="text-sm font-medium text-slate-800">
-                Dra bilder hit eller velg fra enheten
+                Dra bilder og video hit, eller velg fra enheten
               </p>
               <button
                 type="button"
@@ -291,7 +338,7 @@ function BulkPhotoUploadPanel({
                 onClick={() => inputRef.current?.click()}
                 className="mt-4 rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
               >
-                Velg bilder
+                Velg filer
               </button>
             </>
           )}

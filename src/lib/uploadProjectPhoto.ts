@@ -5,15 +5,19 @@ import {
   uploadProjectPhotoStorage,
   type ProjectPhotoWrite,
 } from './project'
+import { isVideoUploadFile } from './projectMedia'
 import type { ProjectPhoto } from './types'
 
 function storageExtension(file: File): string {
   const fromName = file.name.split('.').pop()?.toLowerCase()
   if (fromName && fromName.length <= 5) return fromName
+  if (file.type === 'video/mp4') return 'mp4'
+  if (file.type === 'video/quicktime') return 'mov'
+  if (file.type === 'video/webm') return 'webm'
   if (file.type === 'image/jpeg') return 'jpg'
   if (file.type === 'image/png') return 'png'
   if (file.type === 'image/webp') return 'webp'
-  return 'jpg'
+  return isVideoUploadFile(file) ? 'mp4' : 'jpg'
 }
 
 export async function uploadProjectPhotoFile(

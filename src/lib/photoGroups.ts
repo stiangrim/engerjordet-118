@@ -43,8 +43,4 @@ function localDayKeyFromIso(iso: string): string {
   return toIsoDateLocal(d)
 }
 
-export function isImageUploadFile(file: File): boolean {
-  if (file.type.startsWith('image/')) return true
-  const lower = file.name.toLowerCase()
-  return lower.endsWith('.heic') || lower.endsWith('.heif')
-}
+export { isGalleryUploadFile } from './projectMedia'

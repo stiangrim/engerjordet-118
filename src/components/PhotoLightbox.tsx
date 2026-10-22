@@ -8,6 +8,7 @@ import {
   signedStorageUrl,
   updateProjectPhoto,
 } from '../lib/project'
+import { projectPhotoMediaKind } from '../lib/projectMedia'
 import { previewObjectUrlForRemote } from '../lib/receiptPreview'
 import type { ProjectPhoto } from '../lib/types'
 
@@ -52,7 +53,15 @@ export function PhotoLightbox({
         return
       }
       setDownloadUrl(signed)
-      const fileName = photo.storage_path.split('/').pop() ?? 'bilde.jpg'
+      const fileName = photo.storage_path.split('/').pop() ?? 'fil'
+      const video = projectPhotoMediaKind(photo) === 'video'
+      if (video) {
+        if (!cancelled) {
+          setDisplayUrl(signed)
+          setLoading(false)
+        }
+        return
+      }
       try {
         const preview = await previewObjectUrlForRemote(signed, fileName)
         if (cancelled) {
@@ -102,7 +111,8 @@ export function PhotoLightbox({
 
   if (!photo) return null
 
-  const fileName = photo.storage_path.split('/').pop() ?? 'bilde.jpg'
+  const isVideo = projectPhotoMediaKind(photo) === 'video'
+  const fileName = photo.storage_path.split('/').pop() ?? (isVideo ? 'video.mp4' : 'bilde.jpg')
 
   async function saveCaption() {
     if (!photo) return
@@ -116,7 +126,7 @@ export function PhotoLightbox({
   }
 
   async function remove() {
-    if (!photo || !confirm('Slette dette bildet permanent?')) return
+    if (!photo || !confirm('Slette denne filen permanent?')) return
     setBusy(true)
     try {
       await deleteProjectPhoto(photo)
@@ -132,7 +142,7 @@ export function PhotoLightbox({
       className="fixed inset-0 z-[70] flex flex-col bg-slate-950/95"
       role="dialog"
       aria-modal="true"
-      aria-label="Bildevisning"
+      aria-label={isVideo ? 'Videoavspilling' : 'Bildevisning'}
     >
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-white/10 px-3 py-2 sm:px-4">
         <div className="min-w-0 text-sm text-white">
@@ -171,6 +181,16 @@ export function PhotoLightbox({
               Last ned
             </button>
           ) : null}
+          {canWrite ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void remove()}
+              className="rounded-lg border border-red-400/50 px-3 py-1.5 text-sm font-medium text-red-200 hover:bg-red-950/50 disabled:opacity-50"
+            >
+              Slett
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={onClose}
@@ -183,7 +203,17 @@ export function PhotoLightbox({
 
       <div className="relative flex min-h-0 flex-1 items-center justify-center p-2 sm:p-4">
         {loading ? (
-          <p className="text-sm text-white/70">Laster bilde …</p>
+          <p className="text-sm text-white/70">
+            {isVideo ? 'Laster video …' : 'Laster bilde …'}
+          </p>
+        ) : displayUrl && isVideo ? (
+          <video
+            key={displayUrl}
+            src={displayUrl}
+            controls
+            playsInline
+            className="max-h-[calc(100vh-11rem)] max-w-full bg-black"
+          />
         ) : displayUrl ? (
           <img
             src={displayUrl}
@@ -191,7 +221,7 @@ export function PhotoLightbox({
             className="max-h-[calc(100vh-11rem)] max-w-full object-contain"
           />
         ) : (
-          <p className="text-sm text-white/70">Kunne ikke vise bildet.</p>
+          <p className="text-sm text-white/70">Kunne ikke vise filen.</p>
         )}
       </div>
 
