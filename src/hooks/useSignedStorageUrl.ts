@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { signedStorageUrl } from '../lib/project'
+import { getSignedStorageUrl } from '../lib/signedUrlQueue'
 
 export function useSignedStorageUrl(
   bucket: string,
@@ -16,7 +16,7 @@ export function useSignedStorageUrl(
     }
     let cancelled = false
     setLoading(true)
-    void signedStorageUrl(bucket, path).then((signed) => {
+    void getSignedStorageUrl(bucket, path).then((signed) => {
       if (cancelled) return
       setUrl(signed)
       setLoading(false)

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useCanWrite } from '../access/AccessContext'
 import { CanWrite } from '../components/CanWrite'
 import { LoadState } from '../components/LoadState'
@@ -12,9 +12,8 @@ import {
   deleteProjectPhoto,
   fetchProject,
   fetchProjectPhotos,
-  PROJECT_PHOTOS_BUCKET,
 } from '../lib/project'
-import { useSignedStorageUrl } from '../hooks/useSignedStorageUrl'
+import { usePhotoGridDisplayUrl } from '../hooks/usePhotoGridDisplayUrl'
 import type { ProjectPhoto } from '../lib/types'
 
 export function PhotosPage() {
@@ -165,13 +164,14 @@ function PhotoGridTile({
   onDelete: () => void
 }) {
   const isVideo = projectPhotoMediaKind(photo) === 'video'
-  const thumbPath =
-    photo.thumb_path ??
-    (isVideo ? null : photo.storage_path)
-  const { url, loading } = useSignedStorageUrl(PROJECT_PHOTOS_BUCKET, thumbPath)
+  const { setRootElement, url, loading, retry } = usePhotoGridDisplayUrl(photo)
+  const imgErrorRetried = useRef(false)
 
   return (
-    <div className="group relative aspect-square w-full">
+    <div
+      ref={setRootElement}
+      className="group relative aspect-square w-full"
+    >
       <button
         type="button"
         onClick={onOpen}
@@ -180,9 +180,13 @@ function PhotoGridTile({
       {url ? (
         <img
           src={url}
-          alt={photo.caption.trim() || (isVideo ? 'Prosjektvideo' : 'Prosjektbilde')}
-          loading="lazy"
+          alt=""
           decoding="async"
+          onError={() => {
+            if (imgErrorRetried.current) return
+            imgErrorRetried.current = true
+            retry()
+          }}
           className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
         />
       ) : (
