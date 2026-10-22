@@ -88,11 +88,11 @@ function PhotosContent({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Bilder og video</h2>
-          <p className="text-sm text-slate-600">
-            {photos.length}{' '}
-            {photos.length === 1 ? 'fil' : 'filer'} · gruppert etter tatt-dato
-            (EXIF / fil-metadata)
-          </p>
+          {photos.length > 0 ? (
+            <p className="text-sm text-slate-600 tabular-nums">
+              {photos.length} {photos.length === 1 ? 'fil' : 'filer'}
+            </p>
+          ) : null}
         </div>
         <CanWrite>
           <button
@@ -107,8 +107,7 @@ function PhotosContent({
 
       {photos.length === 0 ? (
         <p className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-12 text-center text-sm text-slate-500">
-          Ingen bilder eller video ennå. Last opp mange på én gang – de sorteres
-          etter når de er tatt.
+          Ingen bilder eller video ennå.
         </p>
       ) : (
         <div className="space-y-8">
@@ -282,11 +281,6 @@ function BulkPhotoUploadPanel({
         <h3 id="bulk-upload-title" className="text-lg font-semibold">
           Last opp bilder og video
         </h3>
-        <p className="mt-1 text-sm text-slate-600">
-          Velg mange filer samtidig. Dato hentes fra EXIF / video-metadata når
-          den finnes (f.eks. iPhone .mov).
-        </p>
-
         <input
           ref={inputRef}
           id={inputId}

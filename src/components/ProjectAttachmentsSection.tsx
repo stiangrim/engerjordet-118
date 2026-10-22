@@ -48,9 +48,6 @@ export function ProjectAttachmentsSection({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-lg font-semibold">Notater og vedlegg</h2>
-          <p className="text-sm text-slate-600">
-            Korte notater, tegninger og filer som hører til prosjektet.
-          </p>
         </div>
         <CanWrite>
           <button
@@ -66,7 +63,6 @@ export function ProjectAttachmentsSection({
       {attachments.length === 0 ? (
         <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-sm text-slate-500">
           Ingen notater ennå.
-          {canWrite ? ' Legg til f.eks. kjøkkendesign eller andre referanser.' : null}
         </p>
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2">
