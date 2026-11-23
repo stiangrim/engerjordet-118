@@ -136,11 +136,14 @@ export function SearchableSelect({
     }
   }, [listId, open, reposition])
 
+  // The panel only mounts once the trigger has been measured, so focus the
+  // search field when it exists, not when `open` flips.
+  const panelMounted = open && panelRect !== null
   useEffect(() => {
-    if (open && showSearch) {
+    if (panelMounted && showSearch) {
       searchRef.current?.focus()
     }
-  }, [open, showSearch])
+  }, [panelMounted, showSearch])
 
   function close() {
     setOpen(false)
@@ -288,6 +291,13 @@ export function SearchableSelect({
         onClick={() => {
           if (open) close()
           else openList()
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape' && open) {
+            // Keep the Escape from also closing a surrounding SideSheet.
+            e.stopPropagation()
+            close()
+          }
         }}
       >
         {selectedOption ? (
