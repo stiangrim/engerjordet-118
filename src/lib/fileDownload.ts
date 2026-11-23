@@ -37,3 +37,11 @@ function triggerAnchorDownload(href: string, fileName: string): void {
   a.click()
   a.remove()
 }
+
+export function downloadTextFile(
+  text: string,
+  fileName: string,
+  mimeType = 'text/csv;charset=utf-8',
+): void {
+  triggerBlobDownload(new Blob([text], { type: mimeType }), fileName)
+}

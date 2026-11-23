@@ -1,4 +1,5 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useCanWrite } from '../access/AccessContext'
 import { CanWrite } from '../components/CanWrite'
 import { BudgetItemForm } from '../components/BudgetItemForm'
@@ -18,6 +19,7 @@ import { varianceTextClass } from '../lib/variance'
 import { BudgetItemActualsPanel } from '../components/BudgetItemActualsPanel'
 import { StatusBadge } from '../components/StatusBadge'
 import type { BudgetItemWithActual, CostEntry, Payee, Receipt } from '../lib/types'
+import { foldForSearch, matchesQuery } from '../lib/costSearch'
 
 type SheetState =
   | { mode: 'create' }
@@ -65,8 +67,21 @@ function BudgetContent({
   setSheet: (s: SheetState) => void
   onChanged: () => void
 }) {
-  const grouped = budgetCategoriesInOrder(items)
-  const totals = items.reduce(
+  const [query, setQuery] = useState('')
+  const visibleItems = useMemo(
+    () =>
+      items.filter((i) =>
+        matchesQuery(
+          foldForSearch(
+            [i.category, i.post, i.description, i.status, i.comment].filter(Boolean).join(' '),
+          ),
+          query,
+        ),
+      ),
+    [items, query],
+  )
+  const grouped = budgetCategoriesInOrder(visibleItems)
+  const totals = visibleItems.reduce(
     (acc, i) => ({
       budget: acc.budget + Number(i.budget_total),
       actual: acc.actual + i.actual_total,
@@ -97,6 +112,7 @@ function BudgetContent({
         <div>
           <h2 className="text-lg font-semibold">Budsjett</h2>
           <p className="text-sm text-slate-600">
+            {query.trim() ? `${visibleItems.length} av ${items.length} poster · ` : ''}
             Sum budsjett {formatNok(totals.budget)} · Faktisk{' '}
             {formatNok(totals.actual)} · Avvik{' '}
             <span className={varianceTextClass(totals.actual - totals.budget)}>
@@ -114,6 +130,19 @@ function BudgetContent({
           </button>
         </CanWrite>
       </div>
+
+      <input
+        type="search"
+        className="input"
+        placeholder="Søk i budsjettposter (kategori, post, beskrivelse, status) …"
+        aria-label="Søk i budsjettposter"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
+
+      {visibleItems.length === 0 ? (
+        <p className="text-sm text-slate-500">Ingen budsjettposter passer søket.</p>
+      ) : null}
 
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
@@ -172,6 +201,16 @@ function BudgetContent({
                         <p className="text-xs text-slate-500 line-clamp-2">
                           {row.description}
                         </p>
+                        {row.actual_total !== 0 ? (
+                          <Link
+                            to={`/kostnader?post=${row.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => e.stopPropagation()}
+                            className="mt-1 inline-block text-xs font-medium text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline"
+                          >
+                            Vis kostnader →
+                          </Link>
+                        ) : null}
                       </td>
                       <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums align-top">
                         {formatNok(Number(row.budget_total))}

@@ -49,6 +49,16 @@ import { CostLineSummary } from '../components/CostLineSummary'
 import { StatCard } from '../components/StatCard'
 import { totalActual } from '../lib/project'
 import { clickableCardClass, selectedRowClass } from '../lib/rowStyles'
+import { CostFilterBar } from '../components/CostFilterBar'
+import { useCostFilter } from '../hooks/useCostFilter'
+import {
+  applyCostFilter,
+  costEntryLine,
+  costLinesToCsv,
+  isCostFilterActive,
+  receiptLine,
+} from '../lib/costSearch'
+import { downloadTextFile } from '../lib/fileDownload'
 
 type CostsTab = 'receipts' | 'manual' | 'payees'
 
@@ -78,6 +88,41 @@ function CostsPageContent({
 
   const { receipts, costEntries } = data
   const [tab, setTab] = useState<CostsTab>('receipts')
+  const [filter, setFilter] = useCostFilter()
+  const filterActive = isCostFilterActive(filter)
+
+  const lookups = useMemo(
+    () => ({
+      budgetLabelById,
+      payeeNameById: new Map(data.payees.map((p) => [p.id, p.name])),
+    }),
+    [budgetLabelById, data.payees],
+  )
+  const receiptHits = useMemo(() => {
+    const byId = new Map(receipts.map((r) => [r.id, r]))
+    const lines = applyCostFilter(
+      receipts.map((r) => receiptLine(r, lookups)),
+      filter,
+    )
+    return { lines, rows: lines.map((l) => byId.get(l.id)!) }
+  }, [receipts, lookups, filter])
+  const entryHits = useMemo(() => {
+    const byId = new Map(costEntries.map((e) => [e.id, e]))
+    const lines = applyCostFilter(
+      costEntries.map((e) => costEntryLine(e, lookups)),
+      filter,
+    )
+    return { lines, rows: lines.map((l) => byId.get(l.id)!) }
+  }, [costEntries, lookups, filter])
+  const activeHits = tab === 'manual' ? entryHits : receiptHits
+
+  function exportCsv() {
+    const name = tab === 'manual' ? 'manuelle-kostnader' : 'kvitteringer'
+    downloadTextFile(
+      costLinesToCsv(activeHits.lines, budgetLabelById),
+      `${name}-${todayIsoDate()}.csv`,
+    )
+  }
 
   const receiptTotal = useMemo(
     () => receipts.reduce((s, r) => s + Number(r.amount), 0),
@@ -127,14 +172,14 @@ function CostsPageContent({
         <CostsTabButton
           active={tab === 'receipts'}
           onClick={() => setTab('receipts')}
-          count={receipts.length}
+          count={receiptHits.rows.length}
         >
           Kvitteringer
         </CostsTabButton>
         <CostsTabButton
           active={tab === 'manual'}
           onClick={() => setTab('manual')}
-          count={costEntries.length}
+          count={entryHits.rows.length}
         >
           Manuelle
         </CostsTabButton>
@@ -146,11 +191,24 @@ function CostsPageContent({
         </CostsTabButton>
       </div>
 
+      {tab !== 'payees' ? (
+        <CostFilterBar
+          filter={filter}
+          onChange={setFilter}
+          budgetItems={data.budgetItems}
+          shown={activeHits.rows.length}
+          total={tab === 'manual' ? costEntries.length : receipts.length}
+          shownSum={activeHits.lines.reduce((sum, l) => sum + l.amount, 0)}
+          onExport={exportCsv}
+        />
+      ) : null}
+
       <div role="tabpanel" className="min-h-[12rem]">
         {tab === 'receipts' ? (
           <ReceiptSection
             projectId={data.project.id}
-            receipts={receipts}
+            receipts={receiptHits.rows}
+            filtered={filterActive}
             budgetItems={data.budgetItems}
             onChanged={onChanged}
           />
@@ -158,7 +216,8 @@ function CostsPageContent({
         {tab === 'manual' ? (
           <CostEntrySection
             projectId={data.project.id}
-            costEntries={costEntries}
+            costEntries={entryHits.rows}
+            filtered={filterActive}
             budgetItems={data.budgetItems}
             payees={data.payees}
             onChanged={onChanged}
@@ -223,12 +282,14 @@ export const ReceiptsPage = CostsPage
 function CostEntrySection({
   projectId,
   costEntries,
+  filtered,
   budgetItems,
   payees,
   onChanged,
 }: {
   projectId: string
   costEntries: CostEntry[]
+  filtered: boolean
   payees: Payee[]
   budgetItems: {
     id: string
@@ -272,7 +333,9 @@ function CostEntrySection({
 
       {costEntries.length === 0 ? (
         <p className="text-sm text-slate-500">
-          Ingen manuelle registreringer ennå (f.eks. mannskapstimer).
+          {filtered
+            ? 'Ingen manuelle registreringer passer søket.'
+            : 'Ingen manuelle registreringer ennå (f.eks. mannskapstimer).'}
         </p>
       ) : (
         <ul className="space-y-2">
@@ -364,11 +427,13 @@ function CostEntrySection({
 function ReceiptSection({
   projectId,
   receipts,
+  filtered,
   budgetItems,
   onChanged,
 }: {
   projectId: string
   receipts: Receipt[]
+  filtered: boolean
   budgetItems: { id: string; category: string; post: string }[]
   onChanged: () => void
 }) {
@@ -412,7 +477,7 @@ function ReceiptSection({
 
       {receipts.length === 0 ? (
         <p className="text-sm text-slate-500">
-          Ingen kvitteringer registrert ennå.
+          {filtered ? 'Ingen kvitteringer passer søket.' : 'Ingen kvitteringer registrert ennå.'}
         </p>
       ) : (
         <ul className="space-y-2">

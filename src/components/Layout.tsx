@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAccess } from '../access/AccessContext'
 import { useProjectTitle } from '../context/ProjectTitleContext'
 import { AuditLogPanel } from './AuditLogPanel'
@@ -64,6 +64,7 @@ export function Layout() {
               Kostnader
             </NavLink>
           </nav>
+          <HeaderCostSearch />
           {authEnabled ? (
             <button
               type="button"
@@ -82,6 +83,34 @@ export function Layout() {
         <AuditLogPanel />
       </main>
     </div>
+  )
+}
+
+/** Search from any page; opens Kostnader filtered on the query. */
+function HeaderCostSearch() {
+  const navigate = useNavigate()
+  const [query, setQuery] = useState('')
+
+  return (
+    <form
+      role="search"
+      onSubmit={(e) => {
+        e.preventDefault()
+        const q = query.trim()
+        if (!q) return
+        navigate(`/kostnader?q=${encodeURIComponent(q)}`)
+        setQuery('')
+      }}
+    >
+      <input
+        type="search"
+        className="input w-44 py-1.5 text-sm"
+        placeholder="Søk kostnader …"
+        aria-label="Søk i kostnader"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
+    </form>
   )
 }
 
