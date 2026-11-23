@@ -25,9 +25,19 @@ function amountSearchText(amount: number): string {
   ].join(' ')
 }
 
+/** 2026-11-19 · 19.11.2026 · 19.11.26 · 19.11 · «torsdag 19. november 2026» · «nov. 2026». */
 function dateSearchText(iso: string | null): string {
   if (!iso) return ''
-  return [iso, formatNorwegianDate(iso), formatNorwegianDateMedium(iso)].join(' ')
+  const [y, m, d] = iso.slice(0, 10).split('-')
+  return [
+    iso,
+    `${d}.${m}.${y}`,
+    `${d}.${m}.${y.slice(2)}`,
+    `${d}.${m}`,
+    `${Number(d)}.${Number(m)}.${y}`,
+    formatNorwegianDate(iso),
+    formatNorwegianDateMedium(iso),
+  ].join(' ')
 }
 
 /** All words in the query must appear somewhere in the haystack. */

@@ -106,7 +106,7 @@ function HeaderCostSearch() {
         type="search"
         className="input w-44 py-1.5 text-sm"
         placeholder="Søk kostnader …"
-        aria-label="Søk i kostnader"
+        aria-label="Hurtigsøk i kostnader fra alle sider"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />
