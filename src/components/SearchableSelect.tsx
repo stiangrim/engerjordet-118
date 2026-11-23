@@ -32,6 +32,27 @@ type Props = {
   id?: string
 }
 
+const PANEL_GAP = 4
+const VIEWPORT_MARGIN = 8
+const LIST_MAX_HEIGHT = 240
+const SEARCH_HEIGHT = 52
+const PANEL_PADDING = 10
+
+/**
+ * Open below the trigger unless the list would run off the bottom of the
+ * viewport and there is more room above; cap the height to the room it gets.
+ */
+function panelPlacement(
+  rect: DOMRect,
+  showSearch: boolean,
+): { above: boolean; maxHeight: number } {
+  const wanted = LIST_MAX_HEIGHT + (showSearch ? SEARCH_HEIGHT : 0) + PANEL_PADDING
+  const below = window.innerHeight - rect.bottom - PANEL_GAP - VIEWPORT_MARGIN
+  const above = rect.top - PANEL_GAP - VIEWPORT_MARGIN
+  const openAbove = below < wanted && above > below
+  return { above: openAbove, maxHeight: Math.min(wanted, openAbove ? above : below) }
+}
+
 function optionSearchText(o: SearchableSelectOption): string {
   return `${o.label} ${o.subLabel ?? ''} ${o.group ?? ''} ${o.keywords ?? ''}`.toLowerCase()
 }
@@ -89,6 +110,8 @@ export function SearchableSelect({
     setPanelRect(el.getBoundingClientRect())
   }, [])
 
+  const placement = panelRect ? panelPlacement(panelRect, showSearch) : null
+
   useEffect(() => {
     if (!open) return
     reposition()
@@ -136,16 +159,19 @@ export function SearchableSelect({
   }
 
   const panel =
-    open && panelRect ? (
+    open && panelRect && placement ? (
       <div
         id={listId}
         role="presentation"
-        className="rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+        className="flex flex-col rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
         style={{
           position: 'fixed',
-          top: panelRect.bottom + 4,
+          ...(placement.above
+            ? { bottom: window.innerHeight - panelRect.top + PANEL_GAP }
+            : { top: panelRect.bottom + PANEL_GAP }),
           left: panelRect.left,
           width: panelRect.width,
+          maxHeight: placement.maxHeight,
           zIndex: 80,
         }}
       >
@@ -161,6 +187,8 @@ export function SearchableSelect({
               onKeyDown={(e) => {
                 if (e.key === 'Escape') {
                   e.preventDefault()
+                  // Keep the Escape from also closing a surrounding SideSheet.
+                  e.stopPropagation()
                   close()
                 }
                 if (e.key === 'Enter' && visibleOptions.length > 0) {
@@ -171,7 +199,12 @@ export function SearchableSelect({
             />
           </div>
         ) : null}
-        <ul role="listbox" aria-labelledby={id} className="max-h-60 overflow-y-auto py-1">
+        <ul
+          role="listbox"
+          aria-labelledby={id}
+          className="min-h-0 flex-1 overflow-y-auto py-1"
+          style={{ maxHeight: LIST_MAX_HEIGHT }}
+        >
           {visibleOptions.length === 0 ? (
             <li className="px-3 py-2 text-sm text-slate-500">Ingen treff</li>
           ) : (
