@@ -79,6 +79,9 @@ export async function createRoleSession(
     ).auth.signInWithPassword({ email, password })
 
   let { data, error } = await signIn()
+  // Only a wrong password means the user is missing or stale. Anything else
+  // (rate limit, outage) must not delete it and log everyone out.
+  if (error && error.code !== "invalid_credentials") throw error
   if (error || !data.session) {
     // Recreate rather than update: deleting the user revokes its sessions, so
     // a rotated password or a tampered account leaves no session behind.
@@ -93,7 +96,9 @@ export async function createRoleSession(
       email_confirm: true,
       app_metadata: { access_role: role },
     })
-    if (createError) throw createError
+    // A concurrent login may have recreated it already; its password is the
+    // same, so signing in below still works.
+    if (createError && createError.code !== "email_exists") throw createError
     ;({ data, error } = await signIn())
     if (error || !data.session) throw error ?? new Error("no_session")
   }
