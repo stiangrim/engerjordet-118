@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+import { callerRole } from "../_shared/roleSession.ts"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,6 +16,11 @@ type Body = {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders })
+  }
+
+  // Calls OpenAI on the project's key, so only an editor session may use it.
+  if ((await callerRole(req)) !== "full") {
+    return json({ error: "Krever innlogging med redigeringstilgang." }, 401)
   }
 
   try {

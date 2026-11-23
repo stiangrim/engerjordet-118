@@ -9,4 +9,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
   )
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// The access login hands back a Supabase session for the password's role;
+// row level security only lets that session read or write. Keep it in
+// sessionStorage, like the access token, so a closed tab means a new login.
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    storage: typeof window === 'undefined' ? undefined : window.sessionStorage,
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+})

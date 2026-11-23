@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+import { createRoleSession, type Role } from "../_shared/roleSession.ts"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,8 +8,6 @@ const corsHeaders = {
 }
 
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000
-
-type Role = "readonly" | "full"
 
 type Body =
   | { action: "login"; password: string }
@@ -160,7 +159,14 @@ Deno.serve(async (req) => {
       resolved.actor,
       sessionSecret,
     )
-    return json({ role: resolved.role, actor: resolved.actor, token })
+    let session
+    try {
+      session = await createRoleSession(resolved.role, sessionSecret)
+    } catch (e) {
+      console.error("role session failed", e)
+      return json({ error: "session_unavailable" }, 503)
+    }
+    return json({ role: resolved.role, actor: resolved.actor, token, session })
   }
 
   if (body.action === "validate") {

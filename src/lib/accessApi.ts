@@ -1,6 +1,13 @@
 export type AccessRole = 'readonly' | 'full'
 
-type LoginOk = { role: AccessRole; token: string; actor: string }
+type RoleSession = { access_token: string; refresh_token: string }
+
+type LoginOk = {
+  role: AccessRole
+  token: string
+  actor: string
+  session: RoleSession
+}
 
 export type LoginResult = LoginOk | 'unavailable' | null
 
@@ -34,7 +41,9 @@ export async function loginWithPassword(password: string): Promise<LoginResult> 
   if (
     (data.role !== 'readonly' && data.role !== 'full') ||
     typeof data.token !== 'string' ||
-    typeof data.actor !== 'string'
+    typeof data.actor !== 'string' ||
+    typeof data.session?.access_token !== 'string' ||
+    typeof data.session?.refresh_token !== 'string'
   ) {
     return null
   }

@@ -19,6 +19,7 @@ import {
   type AccessRole,
 } from './accessConfig'
 import { setAuditSession } from '../lib/auditSession'
+import { supabase } from '../lib/supabase'
 
 type AccessContextValue = {
   role: AccessRole
@@ -57,13 +58,17 @@ export function AccessProvider({ children }: { children: ReactNode }) {
         return
       }
       const validated = await validateSessionToken(token)
+      // Data is only readable with the Supabase session the login handed out;
+      // a token from before that change has none, so it has to log in again.
+      const { data: auth } = await supabase.auth.getSession()
       if (cancelled) return
-      if (validated) {
+      if (validated && auth.session) {
         setRole(validated.role)
         storeAccessToken(token, validated.actor)
         setAuditSession({ role: validated.role, actor: validated.actor })
       } else {
         clearStoredAccessToken()
+        void supabase.auth.signOut({ scope: 'local' })
         setRole('none')
         setAuditSession(null)
       }
@@ -78,6 +83,8 @@ export function AccessProvider({ children }: { children: ReactNode }) {
     const result = await loginWithPassword(password)
     if (result === 'unavailable') return 'unavailable'
     if (!result) return false
+    const { error: sessionError } = await supabase.auth.setSession(result.session)
+    if (sessionError) return 'unavailable'
     storeAccessToken(result.token, result.actor)
     setRole(result.role)
     setAuditSession({ role: result.role, actor: result.actor })
@@ -88,6 +95,8 @@ export function AccessProvider({ children }: { children: ReactNode }) {
     const result = await loginWithPassword(password)
     if (result === 'unavailable') return 'unavailable'
     if (!result || result.role !== 'full') return false
+    const { error: sessionError } = await supabase.auth.setSession(result.session)
+    if (sessionError) return 'unavailable'
     storeAccessToken(result.token, result.actor)
     setRole('full')
     setAuditSession({ role: 'full', actor: result.actor })
@@ -96,6 +105,7 @@ export function AccessProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     clearStoredAccessToken()
+    void supabase.auth.signOut({ scope: 'local' })
     setRole(authEnabled ? 'none' : 'full')
     setAuditSession(authEnabled ? null : { actor: 'Utvikling', role: 'full' })
   }, [authEnabled])
