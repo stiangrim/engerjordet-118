@@ -180,6 +180,11 @@ function csvCell(value: string | number): string {
   return /[";\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 
+/** Typed text: a leading = + - @ would run as a formula in Excel, so defuse it. */
+function csvTextCell(value: string): string {
+  return csvCell(/^[=+\-@\t\r]/.test(value) ? `'${value}` : value)
+}
+
 /** Semicolon CSV with decimal comma and BOM, so Excel in Norwegian opens it as-is. */
 export function costLinesToCsv(
   lines: CostLine[],
@@ -195,18 +200,17 @@ export function costLinesToCsv(
     'Budsjettpost',
     'Betaling',
   ]
-  const rows = lines.map((l) => [
-    l.date ?? '',
-    l.kind === 'receipt' ? 'Kvittering' : 'Manuell',
-    l.vendor,
-    l.description,
-    l.amount.toFixed(2).replace('.', ','),
-    receiptCostTypeLabel(l.costType),
-    l.budgetItemId ? budgetLabelById.get(l.budgetItemId) ?? '' : '',
-    l.paymentStatus,
-  ])
-  return (
-    '﻿' +
-    [header, ...rows].map((r) => r.map(csvCell).join(';')).join('\r\n')
+  const rows = lines.map((l) =>
+    [
+      csvCell(l.date ?? ''),
+      csvCell(l.kind === 'receipt' ? 'Kvittering' : 'Manuell'),
+      csvTextCell(l.vendor),
+      csvTextCell(l.description),
+      csvCell(l.amount.toFixed(2).replace('.', ',')),
+      csvTextCell(receiptCostTypeLabel(l.costType)),
+      csvTextCell(l.budgetItemId ? budgetLabelById.get(l.budgetItemId) ?? '' : ''),
+      csvCell(l.paymentStatus),
+    ].join(';'),
   )
+  return '﻿' + [header.map(csvCell).join(';'), ...rows].join('\r\n')
 }
