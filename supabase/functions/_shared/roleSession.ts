@@ -20,8 +20,14 @@ function adminClient(): SupabaseClient {
   )
 }
 
-/** Password for the role's auth user, derived so no extra secret is needed. */
+/**
+ * Password for the role's auth user, derived from the session secret and the
+ * role's access password. Rotating either one makes the next login miss, which
+ * recreates the user and so revokes every session issued before.
+ */
 async function rolePassword(role: Role, secret: string): Promise<string> {
+  const accessPassword =
+    Deno.env.get(role === "full" ? "ACCESS_PASSWORD_FULL" : "ACCESS_PASSWORD_READONLY") ?? ""
   const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret),
@@ -32,7 +38,7 @@ async function rolePassword(role: Role, secret: string): Promise<string> {
   const sig = await crypto.subtle.sign(
     "HMAC",
     key,
-    new TextEncoder().encode(`auth-user:${role}`),
+    new TextEncoder().encode(`auth-user:${role}:${accessPassword}`),
   )
   return btoa(String.fromCharCode(...new Uint8Array(sig)))
 }
@@ -74,16 +80,20 @@ export async function createRoleSession(
 
   let { data, error } = await signIn()
   if (error || !data.session) {
-    const attrs = {
+    // Recreate rather than update: deleting the user revokes its sessions, so
+    // a rotated password or a tampered account leaves no session behind.
+    const existing = await findUserId(admin, email)
+    if (existing) {
+      const { error: deleteError } = await admin.auth.admin.deleteUser(existing)
+      if (deleteError) throw deleteError
+    }
+    const { error: createError } = await admin.auth.admin.createUser({
+      email,
       password,
       email_confirm: true,
       app_metadata: { access_role: role },
-    }
-    const existing = await findUserId(admin, email)
-    const { error: upsertError } = existing
-      ? await admin.auth.admin.updateUserById(existing, attrs)
-      : await admin.auth.admin.createUser({ email, ...attrs })
-    if (upsertError) throw upsertError
+    })
+    if (createError) throw createError
     ;({ data, error } = await signIn())
     if (error || !data.session) throw error ?? new Error("no_session")
   }
